@@ -173,17 +173,17 @@ struct SimpleOnboardingView: View {
             VStack(spacing: 30) {
                 // Japanese-style welcome header
                 VStack(spacing: 12) {
-                    Text("ようこそ")
+                    Text("welcome".localized)
                         .font(.system(size: 36, weight: .light))
                         .tracking(8)
                         .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                     
-                    Text("MirrorChild")
+                    Text("appTitle".localized)
                         .font(.system(size: 28, weight: .light))
                         .tracking(2)
                         .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
                     
-                    Text("デジタルコンパニオン")
+                    Text("digitalCompanion".localized)
                         .font(.system(size: 20, weight: .light))
                         .tracking(4)
                         .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
@@ -223,7 +223,7 @@ struct SimpleOnboardingView: View {
                 
                 // Japanese-styled info card
                 VStack(spacing: 22) {
-                    Text("このアプリのご紹介")
+                    Text("appIntroTitle".localized)
                         .font(.system(size: 20, weight: .medium))
                         .tracking(2)
                         .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
@@ -234,7 +234,7 @@ struct SimpleOnboardingView: View {
                             Image(systemName: "checkmark.circle")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
                                 .font(.system(size: 22, weight: .light))
-                            Text("スマートフォンの操作をサポート")
+                            Text("feature1".localized)
                                 .font(.system(size: 17, weight: .light))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
@@ -245,7 +245,7 @@ struct SimpleOnboardingView: View {
                             Image(systemName: "checkmark.circle")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
                                 .font(.system(size: 22, weight: .light))
-                            Text("必要な機能を簡単に見つける")
+                            Text("feature2".localized)
                                 .font(.system(size: 17, weight: .light))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
@@ -256,7 +256,7 @@ struct SimpleOnboardingView: View {
                             Image(systemName: "checkmark.circle")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
                                 .font(.system(size: 22, weight: .light))
-                            Text("日常のタスクをお手伝い")
+                            Text("feature3".localized)
                                 .font(.system(size: 17, weight: .light))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
@@ -280,7 +280,7 @@ struct SimpleOnboardingView: View {
                     // Dismiss onboarding
                     UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
                 }) {
-                    Text("始めましょう")
+                    Text("startButton".localized)
                         .font(.system(size: 20, weight: .medium))
                         .tracking(4)
                         .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
