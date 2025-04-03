@@ -1,0 +1,41 @@
+/* Main screen */
+"appTitle" = "MirrorChild";
+"settingsButton" = "Settings";
+"selectPrompt" = "Please select";
+"voiceButtonLabel" = "Voice";
+"screenButtonLabel" = "Screen";
+"voiceButtonA11y" = "Voice Button";
+"voiceButtonA11yHint" = "Tap to activate voice assistance";
+"screenButtonA11y" = "Screen Button";
+"screenButtonA11yHint" = "Tap to activate screen assistance";
+
+/* Voice feedback messages */
+"initialGreeting" = "Hello! I'm here to assist you with your device.";
+"listeningMessage" = "Can you hear me? I'm listening to you now.";
+"voiceOffMessage" = "Voice assistance is off.";
+"screenOnMessage" = "I can see your screen now.";
+"screenOffMessage" = "Screen sharing is stopped.";
+
+/* Settings screen */
+"settingsTitle" = "Settings";
+"voiceTypeLabel" = "Voice Type";
+"textSizeLabel" = "Text Size";
+"smallLabel" = "Small";
+"largeLabel" = "Large";
+"sampleText" = "Sample Text";
+"assistantPersonalityLabel" = "Assistant Personality";
+"calmTrait" = "Calm";
+"kindTrait" = "Kind";
+"helpfulTrait" = "Helpful";
+"aboutAppLabel" = "About App";
+"versionInfo" = "MirrorChild Version 1.0.0";
+"doneButton" = "Done";
+
+/* Onboarding screen */
+"welcome" = "Welcome";
+"digitalCompanion" = "Digital Companion";
+"appIntroTitle" = "About this app";
+"feature1" = "Support for smartphone operations";
+"feature2" = "Easily find needed features";
+"feature3" = "Help with daily tasks";
+"startButton" = "Let's begin"; 

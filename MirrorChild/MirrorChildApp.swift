@@ -118,51 +118,193 @@ struct MirrorChildApp: App {
     }
 }
 
-// A simplified onboarding view
+// A simplified onboarding view with Japanese aesthetic
 struct SimpleOnboardingView: View {
     @State private var currentStep = 0
     @State private var userName = ""
     
     var body: some View {
         ZStack {
-            // Background
-            Color.blue.opacity(0.2).ignoresSafeArea()
+            // Subtle gradient background
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.97, green: 0.97, blue: 0.98),
+                    Color(red: 0.96, green: 0.96, blue: 0.98),
+                    Color(red: 0.95, green: 0.95, blue: 0.98)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            // Cherry blossom decorative elements
+            GeometryReader { geometry in
+                ZStack {
+                    // Top right cherry blossom
+                    Image(systemName: "sakurasou")
+                        .font(.system(size: 30))
+                        .foregroundColor(Color.pink.opacity(0.3))
+                        .position(x: geometry.size.width - 40, y: 60)
+                    
+                    // Bottom left cherry blossom
+                    Image(systemName: "sakurasou")
+                        .font(.system(size: 24))
+                        .foregroundColor(Color.pink.opacity(0.2))
+                        .position(x: 30, y: geometry.size.height - 100)
+                    
+                    // Center decorative line
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.0),
+                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.3),
+                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.0)
+                                ]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width, height: 1)
+                        .position(x: geometry.size.width/2, y: geometry.size.height/2 - 40)
+                }
+            }
             
             VStack(spacing: 30) {
-                Text("Welcome to MirrorChild!")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
-                Text("A simplified digital companion")
-                    .font(.title2)
+                // Japanese-style welcome header
+                VStack(spacing: 12) {
+                    Text("ようこそ")
+                        .font(.system(size: 36, weight: .light))
+                        .tracking(8)
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                    
+                    Text("MirrorChild")
+                        .font(.system(size: 28, weight: .light))
+                        .tracking(2)
+                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                    
+                    Text("デジタルコンパニオン")
+                        .font(.system(size: 20, weight: .light))
+                        .tracking(4)
+                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                        .padding(.top, 5)
+                }
+                .padding(.top, 30)
                 
                 Spacer()
                 
-                Image(systemName: "person.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundColor(.blue)
-                    .frame(width: 150, height: 150)
-                    .padding(.vertical, 20)
+                // Stylized avatar in circular frame
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.9))
+                        .frame(width: 160, height: 160)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.4),
+                                            Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.4)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                    
+                    Image(systemName: "person.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                        .frame(width: 70, height: 70)
+                }
                 
-                Text("This is the simplified version without AI features.")
-                    .font(.headline)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                // Japanese-styled info card
+                VStack(spacing: 22) {
+                    Text("このアプリのご紹介")
+                        .font(.system(size: 20, weight: .medium))
+                        .tracking(2)
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                    
+                    VStack(spacing: 14) {
+                        // Feature item
+                        HStack(spacing: 15) {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                .font(.system(size: 22, weight: .light))
+                            Text("スマートフォンの操作をサポート")
+                                .font(.system(size: 17, weight: .light))
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            Spacer()
+                        }
+                        
+                        // Feature item
+                        HStack(spacing: 15) {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                .font(.system(size: 22, weight: .light))
+                            Text("必要な機能を簡単に見つける")
+                                .font(.system(size: 17, weight: .light))
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            Spacer()
+                        }
+                        
+                        // Feature item
+                        HStack(spacing: 15) {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                .font(.system(size: 22, weight: .light))
+                            Text("日常のタスクをお手伝い")
+                                .font(.system(size: 17, weight: .light))
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            Spacer()
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                }
+                .padding(25)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.9))
+                        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                )
+                .padding(.horizontal, 25)
+                .padding(.top, 10)
                 
                 Spacer()
                 
+                // Japanese-styled start button
                 Button(action: {
                     // Dismiss onboarding
                     UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
                 }) {
-                    Text("Get Started")
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(width: 200)
-                        .background(Color.blue)
-                        .cornerRadius(10)
+                    Text("始めましょう")
+                        .font(.system(size: 20, weight: .medium))
+                        .tracking(4)
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, 40)
+                        .background(
+                            RoundedRectangle(cornerRadius: 30)
+                                .stroke(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.5),
+                                            Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.5)
+                                        ]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                                .background(
+                                    RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.white.opacity(0.7))
+                                )
+                                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
+                        )
                 }
                 .padding(.bottom, 50)
             }

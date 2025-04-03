@@ -13,142 +13,247 @@ struct ContentView: View {
     
     // UI state
     @State private var showingSettings = false
-    @State private var messageText = "Hi there! I'm your digital companion. How can I help you today?"
+    @State private var messageText = "initialGreeting".localized
     @State private var isMessageAnimating = false
     @State private var isMicrophoneActive = false
     @State private var isScreenSharingActive = false
     
     // Constants
-    let avatarSize: CGFloat = 200
+    let avatarSize: CGFloat = 160
     
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.2)]),
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+            // Subtle gradient background inspired by Japanese dawn (Akebono)
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.97, green: 0.97, blue: 0.98),
+                    Color(red: 0.96, green: 0.96, blue: 0.98),
+                    Color(red: 0.95, green: 0.95, blue: 0.98)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
             
-            VStack(spacing: 20) {
-                // Top bar with settings button
+            // Cherry blossom decorative elements (subtle)
+            GeometryReader { geometry in
+                ZStack {
+                    // Top right cherry blossom
+                    Image(systemName: "sakurasou")
+                        .font(.system(size: 30))
+                        .foregroundColor(Color.pink.opacity(0.3))
+                        .position(x: geometry.size.width - 40, y: 60)
+                    
+                    // Bottom left cherry blossom
+                    Image(systemName: "sakurasou")
+                        .font(.system(size: 24))
+                        .foregroundColor(Color.pink.opacity(0.2))
+                        .position(x: 30, y: geometry.size.height - 100)
+                }
+            }
+            
+            VStack(spacing: 25) {
+                // Top bar with elegant, minimalist design
                 HStack {
+                    Text("appTitle".localized)
+                        .font(.system(size: 22, weight: .light))
+                        .tracking(2)
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                        .padding(.leading)
+                    
                     Spacer()
+                    
                     Button(action: {
                         showingSettings = true
                     }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.primary)
-                            .padding()
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.6))
+                                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                            )
                     }
+                    .accessibilityLabel("settingsButton".localized)
+                    .padding(.trailing)
                 }
+                .padding(.top, 15)
                 
                 Spacer()
                 
-                // Avatar circle
+                // Japanese-inspired avatar circle
                 ZStack {
+                    // Circular background with subtle border
                     Circle()
                         .fill(Color.white.opacity(0.9))
                         .frame(width: avatarSize, height: avatarSize)
-                        .shadow(radius: 10)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.4),
+                                            Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.4)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
                     
-                    // Placeholder avatar image
+                    // Stylized avatar image
                     Image(systemName: "person.fill")
                         .resizable()
                         .scaledToFit()
-                        .foregroundColor(.blue)
-                        .frame(width: avatarSize * 0.6, height: avatarSize * 0.6)
+                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                        .frame(width: avatarSize * 0.45, height: avatarSize * 0.45)
                     
-                    // Animation rings when listening
+                    // Subtle animation for microphone active state
                     if isMicrophoneActive {
-                        ForEach(0..<3) { i in
-                            Circle()
-                                .stroke(Color.blue.opacity(0.5), lineWidth: 2)
-                                .frame(width: avatarSize + CGFloat(i * 30), 
-                                       height: avatarSize + CGFloat(i * 30))
-                                .scaleEffect(isMicrophoneActive ? 1.2 : 1.0)
-                                .opacity(isMicrophoneActive ? 0.0 : 0.5)
-                                .animation(
-                                    Animation.easeInOut(duration: 1.5)
-                                        .repeatForever(autoreverses: false)
-                                        .delay(Double(i) * 0.3),
-                                    value: isMicrophoneActive
-                                )
-                        }
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color(red: 0.9, green: 0.5, blue: 0.5).opacity(0.3),
+                                        Color(red: 0.9, green: 0.6, blue: 0.7).opacity(0.3)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                            .frame(width: avatarSize + 15, height: avatarSize + 15)
+                            .scaleEffect(isMicrophoneActive ? 1.05 : 1.0)
+                            .opacity(isMicrophoneActive ? 0.8 : 0)
+                            .animation(
+                                Animation.easeInOut(duration: 1.5)
+                                    .repeatForever(autoreverses: true),
+                                value: isMicrophoneActive
+                            )
                     }
                 }
+                .padding(.bottom, 10)
                 
-                // Message text
+                // Message text with Japanese-inspired paper card design
                 Text(messageText)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 20, weight: .regular))
+                    .tracking(0.5)
+                    .lineSpacing(6)
                     .multilineTextAlignment(.center)
-                    .foregroundColor(.primary)
+                    .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
                     .padding(.horizontal, 30)
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 25)
                     .background(
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: 12)
                             .fill(Color.white.opacity(0.9))
-                            .shadow(radius: 5)
+                            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 3)
                     )
-                    .padding(.horizontal, 20)
-                    .opacity(isMessageAnimating ? 1 : 0.7)
-                    .scaleEffect(isMessageAnimating ? 1.02 : 1)
-                    .animation(
-                        Animation.easeInOut(duration: 2).repeatForever(autoreverses: true),
-                        value: isMessageAnimating
-                    )
+                    .padding(.horizontal, 25)
+                    .opacity(isMessageAnimating ? 1 : 0.9)
                     .onAppear {
                         isMessageAnimating = true
                     }
                 
                 Spacer()
                 
-                // Control buttons
-                HStack(spacing: 40) {
-                    // Microphone button
+                // Subtle instruction text
+                Text("selectPrompt".localized)
+                    .font(.system(size: 16, weight: .light))
+                    .tracking(1)
+                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.55))
+                    .padding(.bottom, 5)
+                
+                // Control buttons - Japanese-inspired
+                HStack(spacing: 60) {
+                    // Voice button
                     Button(action: toggleMicrophone) {
-                        VStack {
+                        VStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(isMicrophoneActive ? Color.red.opacity(0.8) : Color.gray.opacity(0.2))
-                                    .frame(width: 70, height: 70)
-                                    .shadow(radius: 5)
+                                    .fill(
+                                        isMicrophoneActive ? 
+                                        Color(red: 0.9, green: 0.5, blue: 0.5).opacity(0.2) :
+                                        Color(red: 0.95, green: 0.95, blue: 0.98)
+                                    )
+                                    .frame(width: 80, height: 80)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                isMicrophoneActive ?
+                                                Color(red: 0.9, green: 0.5, blue: 0.5).opacity(0.4) :
+                                                Color(red: 0.6, green: 0.6, blue: 0.7).opacity(0.3),
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                                 
                                 Image(systemName: "mic.fill")
-                                    .font(.system(size: 30))
-                                    .foregroundColor(isMicrophoneActive ? .white : .gray)
+                                    .font(.system(size: 30, weight: .light))
+                                    .foregroundColor(
+                                        isMicrophoneActive ?
+                                        Color(red: 0.9, green: 0.4, blue: 0.4) :
+                                        Color(red: 0.5, green: 0.5, blue: 0.7)
+                                    )
                             }
                             
-                            Text("Microphone")
-                                .font(.caption)
-                                .foregroundColor(.primary)
+                            Text("voiceButtonLabel".localized)
+                                .font(.system(size: 17, weight: .light))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                         }
                     }
+                    .accessibilityLabel("voiceButtonA11y".localized)
+                    .accessibilityHint("voiceButtonA11yHint".localized)
                     
-                    // Screen sharing button
+                    // Screen button
                     Button(action: toggleScreenSharing) {
-                        VStack {
+                        VStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(isScreenSharingActive ? Color.green.opacity(0.8) : Color.gray.opacity(0.2))
-                                    .frame(width: 70, height: 70)
-                                    .shadow(radius: 5)
+                                    .fill(
+                                        isScreenSharingActive ? 
+                                        Color(red: 0.5, green: 0.7, blue: 0.6).opacity(0.2) :
+                                        Color(red: 0.95, green: 0.95, blue: 0.98)
+                                    )
+                                    .frame(width: 80, height: 80)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                isScreenSharingActive ?
+                                                Color(red: 0.5, green: 0.7, blue: 0.6).opacity(0.4) :
+                                                Color(red: 0.6, green: 0.6, blue: 0.7).opacity(0.3),
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                                 
-                                Image(systemName: "rectangle.on.rectangle.fill")
-                                    .font(.system(size: 26))
-                                    .foregroundColor(isScreenSharingActive ? .white : .gray)
+                                Image(systemName: "rectangle.on.rectangle")
+                                    .font(.system(size: 26, weight: .light))
+                                    .foregroundColor(
+                                        isScreenSharingActive ?
+                                        Color(red: 0.4, green: 0.6, blue: 0.5) :
+                                        Color(red: 0.5, green: 0.5, blue: 0.7)
+                                    )
                             }
                             
-                            Text("Screen")
-                                .font(.caption)
-                                .foregroundColor(.primary)
+                            Text("screenButtonLabel".localized)
+                                .font(.system(size: 17, weight: .light))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                         }
                     }
+                    .accessibilityLabel("screenButtonA11y".localized)
+                    .accessibilityHint("screenButtonA11yHint".localized)
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, 50)
             }
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView()
+            JapaneseStyleSettingsView()
         }
     }
     
@@ -157,80 +262,185 @@ struct ContentView: View {
     private func toggleMicrophone() {
         isMicrophoneActive.toggle()
         if isMicrophoneActive {
-            messageText = "I'm listening..."
+            messageText = "listeningMessage".localized
         } else {
-            messageText = "How else can I help you?"
+            messageText = "voiceOffMessage".localized
         }
     }
     
     private func toggleScreenSharing() {
         isScreenSharingActive.toggle()
         if isScreenSharingActive {
-            messageText = "I can see your screen now. What would you like help with?"
+            messageText = "screenOnMessage".localized
         } else {
-            messageText = "Screen sharing stopped. How else can I help you?"
+            messageText = "screenOffMessage".localized
         }
     }
 }
 
-struct SettingsView: View {
+struct JapaneseStyleSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var selectedVoice = "shimmer"
-    @State private var temperature: Double = 0.7
-    @State private var personalityTraits: [String] = ["Friendly", "Patient", "Helpful"]
+    @State private var fontSize: Double = 1.0
+    @State private var personalityTraits: [String] = ["calmTrait".localized, "kindTrait".localized, "helpfulTrait".localized]
     
     let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Companion Voice")) {
-                    Picker("Voice", selection: $selectedVoice) {
-                        ForEach(availableVoices, id: \.self) { voice in
-                            Text(voice.capitalized)
-                                .tag(voice)
+            ZStack {
+                // Background
+                Color(red: 0.97, green: 0.97, blue: 0.98).ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 30) {
+                        // Voice selection
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("voiceTypeLabel".localized)
+                                .font(.system(size: 18, weight: .medium))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                .padding(.leading, 10)
+                            
+                            Picker("Voice Type", selection: $selectedVoice) {
+                                ForEach(availableVoices, id: \.self) { voice in
+                                    Text(voice.capitalized)
+                                        .font(.system(size: 18))
+                                        .tag(voice)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .frame(height: 100)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white)
+                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                            )
+                            .padding(.horizontal, 10)
                         }
-                    }
-                    .pickerStyle(.menu)
-                }
-                
-                Section(header: Text("Personality")) {
-                    ForEach(personalityTraits, id: \.self) { trait in
-                        HStack {
-                            Text(trait)
-                            Spacer()
-                            Image(systemName: "checkmark")
-                                .foregroundColor(.blue)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 15)
+                        
+                        // Text size adjustment
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("textSizeLabel".localized)
+                                .font(.system(size: 18, weight: .medium))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                .padding(.leading, 10)
+                            
+                            VStack(alignment: .leading, spacing: 15) {
+                                HStack {
+                                    Text("smallLabel".localized)
+                                        .font(.system(size: 16, weight: .light))
+                                    Slider(value: $fontSize, in: 0.8...1.4, step: 0.1)
+                                        .accentColor(Color(red: 0.6, green: 0.6, blue: 0.7))
+                                    Text("largeLabel".localized)
+                                        .font(.system(size: 20, weight: .light))
+                                }
+                                
+                                Text("sampleText".localized)
+                                    .font(.system(size: 24 * fontSize, weight: .light))
+                                    .tracking(1)
+                                    .padding(.top, 5)
+                            }
+                            .padding(20)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white)
+                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                            )
+                            .padding(.horizontal, 10)
                         }
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 15)
+                        
+                        // Assistant traits
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("assistantPersonalityLabel".localized)
+                                .font(.system(size: 18, weight: .medium))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                .padding(.leading, 10)
+                            
+                            VStack(spacing: 0) {
+                                ForEach(personalityTraits, id: \.self) { trait in
+                                    HStack {
+                                        Text(trait)
+                                            .font(.system(size: 18, weight: .light))
+                                            .tracking(0.5)
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 18, weight: .light))
+                                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                                    }
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 15)
+                                    
+                                    if trait != personalityTraits.last {
+                                        Divider()
+                                            .background(Color(red: 0.9, green: 0.9, blue: 0.95))
+                                            .padding(.leading, 15)
+                                    }
+                                }
+                            }
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white)
+                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                            )
+                            .padding(.horizontal, 10)
+                        }
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 15)
+                        
+                        // About section
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("aboutAppLabel".localized)
+                                .font(.system(size: 18, weight: .medium))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                .padding(.leading, 10)
+                            
+                            HStack {
+                                Text("versionInfo".localized)
+                                    .font(.system(size: 16, weight: .light))
+                                    .tracking(0.5)
+                                    .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
+                                Spacer()
+                            }
+                            .padding(15)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white)
+                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                            )
+                            .padding(.horizontal, 10)
+                        }
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 15)
                     }
-                    
-                    Button("Add Trait") {
-                        // In a real app, show a dialog to add a new trait
-                    }
-                }
-                
-                Section(header: Text("Response Style")) {
-                    VStack {
-                        Text("Creativity: \(Int(temperature * 100))%")
-                        Slider(value: $temperature, in: 0...1)
-                    }
-                }
-                
-                Section(header: Text("Account")) {
-                    Text("Manage Apple ID")
-                        .foregroundColor(.blue)
-                }
-                
-                Section(header: Text("About")) {
-                    Text("Version 1.0.0")
+                    .padding(.vertical, 20)
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("settingsTitle".localized)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button(action: {
                         dismiss()
+                    }) {
+                        Text("doneButton".localized)
+                            .font(.system(size: 16, weight: .medium))
+                            .tracking(1)
+                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 15)
+                            .background(
+                                Capsule()
+                                    .stroke(Color(red: 0.5, green: 0.5, blue: 0.7).opacity(0.3), lineWidth: 1)
+                            )
                     }
                 }
             }

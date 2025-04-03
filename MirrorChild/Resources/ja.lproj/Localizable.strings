@@ -1,0 +1,41 @@
+/* Main screen */
+"appTitle" = "ミラーチャイルド";
+"settingsButton" = "設定";
+"selectPrompt" = "選択してください";
+"voiceButtonLabel" = "音声";
+"screenButtonLabel" = "画面";
+"voiceButtonA11y" = "音声ボタン";
+"voiceButtonA11yHint" = "タップして音声アシスタンスを有効にする";
+"screenButtonA11y" = "画面ボタン";
+"screenButtonA11yHint" = "タップして画面アシスタンスを有効にする";
+
+/* Voice feedback messages */
+"initialGreeting" = "こんにちは! デバイスの操作をお手伝いします。";
+"listeningMessage" = "私の声が聞こえますか？ 今あなたの声を聞いています。";
+"voiceOffMessage" = "音声アシスタンスがオフになりました。";
+"screenOnMessage" = "画面を確認しています。";
+"screenOffMessage" = "画面共有が停止しました。";
+
+/* Settings screen */
+"settingsTitle" = "設定";
+"voiceTypeLabel" = "音声タイプ";
+"textSizeLabel" = "文字サイズ";
+"smallLabel" = "小";
+"largeLabel" = "大";
+"sampleText" = "サンプルテキスト";
+"assistantPersonalityLabel" = "アシスタントの性格";
+"calmTrait" = "穏やか";
+"kindTrait" = "親切";
+"helpfulTrait" = "役立つ";
+"aboutAppLabel" = "アプリについて";
+"versionInfo" = "MirrorChild バージョン 1.0.0";
+"doneButton" = "完了";
+
+/* Onboarding screen */
+"welcome" = "ようこそ";
+"digitalCompanion" = "デジタルコンパニオン";
+"appIntroTitle" = "このアプリのご紹介";
+"feature1" = "スマートフォンの操作をサポート";
+"feature2" = "必要な機能を簡単に見つける";
+"feature3" = "日常のタスクをお手伝い";
+"startButton" = "始めましょう"; 
