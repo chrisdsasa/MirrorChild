@@ -45,6 +45,16 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		12ABCDEF0123456789ABCDEF /* Localization */ = {
+			isa = PBXGroup;
+			children = (
+				12ABCDEF0123456789ABCDE1 /* en.lproj */,
+				12ABCDEF0123456789ABCDE2 /* ja.lproj */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+			usesTabs = 0;
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -102,6 +112,13 @@
 			targets = (
 				6A359A5C2D9EBB6700E8BAC4 /* MirrorChild */,
 			);
+			buildSettings = {
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INFOPLIST_KEY_CFBundleLocalizations = (
+					en,
+					ja,
+				);
+			};
 		};
 /* End PBXProject section */
 

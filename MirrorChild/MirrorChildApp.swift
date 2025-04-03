@@ -141,13 +141,13 @@ struct SimpleOnboardingView: View {
             GeometryReader { geometry in
                 ZStack {
                     // Top right cherry blossom
-                    Image(systemName: "sakurasou")
+                    Image(systemName: "leaf.fill")
                         .font(.system(size: 30))
                         .foregroundColor(Color.pink.opacity(0.3))
                         .position(x: geometry.size.width - 40, y: 60)
                     
                     // Bottom left cherry blossom
-                    Image(systemName: "sakurasou")
+                    Image(systemName: "leaf.fill")
                         .font(.system(size: 24))
                         .foregroundColor(Color.pink.opacity(0.2))
                         .position(x: 30, y: geometry.size.height - 100)

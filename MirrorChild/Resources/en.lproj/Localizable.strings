@@ -19,10 +19,8 @@
 /* Settings screen */
 "settingsTitle" = "Settings";
 "voiceTypeLabel" = "Voice Type";
-"textSizeLabel" = "Text Size";
-"smallLabel" = "Small";
-"largeLabel" = "Large";
-"sampleText" = "Sample Text";
+"voiceProfileLabel" = "Voice Profile";
+"customizeVoiceButton" = "Customize Your Voice";
 "assistantPersonalityLabel" = "Assistant Personality";
 "calmTrait" = "Calm";
 "kindTrait" = "Kind";
@@ -30,6 +28,12 @@
 "aboutAppLabel" = "About App";
 "versionInfo" = "MirrorChild Version 1.0.0";
 "doneButton" = "Done";
+
+/* Voice Profile screen */
+"voiceProfileTitle" = "Voice Profile";
+"voiceProfileInstructions" = "Record a sample of your voice or the voice you want to replicate. For best results, record at least 15 seconds of clear speech.";
+"uploadVoiceProfile" = "Upload Voice Sample";
+"savedRecordings" = "Saved Recordings";
 
 /* Onboarding screen */
 "welcome" = "Welcome";

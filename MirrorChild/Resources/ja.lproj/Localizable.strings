@@ -19,10 +19,8 @@
 /* Settings screen */
 "settingsTitle" = "設定";
 "voiceTypeLabel" = "音声タイプ";
-"textSizeLabel" = "文字サイズ";
-"smallLabel" = "小";
-"largeLabel" = "大";
-"sampleText" = "サンプルテキスト";
+"voiceProfileLabel" = "音声プロファイル";
+"customizeVoiceButton" = "あなたの声をカスタマイズ";
 "assistantPersonalityLabel" = "アシスタントの性格";
 "calmTrait" = "穏やか";
 "kindTrait" = "親切";
@@ -30,6 +28,12 @@
 "aboutAppLabel" = "アプリについて";
 "versionInfo" = "MirrorChild バージョン 1.0.0";
 "doneButton" = "完了";
+
+/* Voice Profile screen */
+"voiceProfileTitle" = "音声プロファイル";
+"voiceProfileInstructions" = "あなたの声、または複製したい声のサンプルを録音してください。最良の結果を得るには、少なくとも15秒の明瞭な音声を録音してください。";
+"uploadVoiceProfile" = "音声サンプルをアップロード";
+"savedRecordings" = "保存された録音";
 
 /* Onboarding screen */
 "welcome" = "ようこそ";

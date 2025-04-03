@@ -39,13 +39,13 @@ struct ContentView: View {
             GeometryReader { geometry in
                 ZStack {
                     // Top right cherry blossom
-                    Image(systemName: "sakurasou")
+                    Image(systemName: "leaf.fill")
                         .font(.system(size: 30))
                         .foregroundColor(Color.pink.opacity(0.3))
                         .position(x: geometry.size.width - 40, y: 60)
                     
                     // Bottom left cherry blossom
-                    Image(systemName: "sakurasou")
+                    Image(systemName: "leaf.fill")
                         .font(.system(size: 24))
                         .foregroundColor(Color.pink.opacity(0.2))
                         .position(x: 30, y: geometry.size.height - 100)
@@ -282,8 +282,8 @@ struct JapaneseStyleSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var selectedVoice = "shimmer"
-    @State private var fontSize: Double = 1.0
     @State private var personalityTraits: [String] = ["calmTrait".localized, "kindTrait".localized, "helpfulTrait".localized]
+    @State private var showingVoiceProfilePage = false
     
     let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
     
@@ -322,35 +322,37 @@ struct JapaneseStyleSettingsView: View {
                         .padding(.vertical, 5)
                         .padding(.horizontal, 15)
                         
-                        // Text size adjustment
+                        // Voice Profile Section
                         VStack(alignment: .leading, spacing: 15) {
-                            Text("textSizeLabel".localized)
+                            Text("voiceProfileLabel".localized)
                                 .font(.system(size: 18, weight: .medium))
                                 .tracking(1)
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                 .padding(.leading, 10)
                             
-                            VStack(alignment: .leading, spacing: 15) {
+                            Button(action: {
+                                showingVoiceProfilePage = true
+                            }) {
                                 HStack {
-                                    Text("smallLabel".localized)
+                                    Text("customizeVoiceButton".localized)
+                                        .font(.system(size: 18, weight: .light))
+                                        .tracking(0.5)
+                                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.6))
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
                                         .font(.system(size: 16, weight: .light))
-                                    Slider(value: $fontSize, in: 0.8...1.4, step: 0.1)
-                                        .accentColor(Color(red: 0.6, green: 0.6, blue: 0.7))
-                                    Text("largeLabel".localized)
-                                        .font(.system(size: 20, weight: .light))
+                                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                                 }
-                                
-                                Text("sampleText".localized)
-                                    .font(.system(size: 24 * fontSize, weight: .light))
-                                    .tracking(1)
-                                    .padding(.top, 5)
+                                .padding(.vertical, 15)
+                                .padding(.horizontal, 20)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                )
                             }
-                            .padding(20)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white)
-                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                            )
                             .padding(.horizontal, 10)
                         }
                         .padding(.vertical, 5)
@@ -444,7 +446,292 @@ struct JapaneseStyleSettingsView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingVoiceProfilePage) {
+                VoiceProfileView()
+            }
         }
+    }
+}
+
+struct VoiceProfileView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var isRecording = false
+    @State private var recordedSamples: [CGFloat] = []
+    @State private var uploadProgress: CGFloat = 0
+    @State private var isUploading = false
+    @State private var recordings: [Recording] = [
+        Recording(name: "Sample 1", duration: "0:12"),
+        Recording(name: "Sample 2", duration: "0:27")
+    ]
+    
+    struct Recording: Identifiable {
+        let id = UUID()
+        let name: String
+        let duration: String
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background
+                Color(red: 0.97, green: 0.97, blue: 0.98).ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 25) {
+                        instructionsView
+                        recordingVisualizerView
+                        uploadButtonView
+                        
+                        // Divider
+                        Rectangle()
+                            .fill(Color(red: 0.8, green: 0.8, blue: 0.9).opacity(0.3))
+                            .frame(height: 1)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                        
+                        savedRecordingsView
+                    }
+                }
+            }
+            .navigationTitle("voiceProfileTitle".localized)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("doneButton".localized)
+                            .font(.system(size: 16, weight: .medium))
+                            .tracking(1)
+                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 15)
+                            .background(
+                                Capsule()
+                                    .stroke(Color(red: 0.5, green: 0.5, blue: 0.7).opacity(0.3), lineWidth: 1)
+                            )
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Subviews
+    
+    private var instructionsView: some View {
+        Text("voiceProfileInstructions".localized)
+            .font(.system(size: 17, weight: .light))
+            .tracking(0.5)
+            .lineSpacing(5)
+            .multilineTextAlignment(.center)
+            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+    }
+    
+    private var recordingVisualizerView: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
+                .frame(height: 180)
+            
+            if recordedSamples.isEmpty {
+                placeholderWaveformView
+            } else {
+                actualWaveformView
+            }
+            
+            recordButtonView
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    private var placeholderWaveformView: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<30, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.3))
+                    .frame(width: 3, height: CGFloat.random(in: 5...40))
+            }
+        }
+    }
+    
+    private var actualWaveformView: some View {
+        HStack(spacing: 4) {
+            ForEach(recordedSamples.indices, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                    .frame(width: 3, height: recordedSamples[index])
+            }
+        }
+    }
+    
+    private var recordButtonView: some View {
+        VStack {
+            Spacer()
+            
+            recordButton
+                .padding(.bottom, 16)
+        }
+    }
+    
+    private var recordButton: some View {
+        Button(action: {
+            isRecording.toggle()
+            if isRecording {
+                startRecording()
+            } else {
+                stopRecording()
+            }
+        }) {
+            Circle()
+                .fill(isRecording ? Color.red.opacity(0.8) : Color(red: 0.5, green: 0.5, blue: 0.8))
+                .frame(width: 56, height: 56)
+                .overlay(recordButtonOverlay)
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        }
+    }
+    
+    @ViewBuilder
+    private var recordButtonOverlay: some View {
+        if isRecording {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.white)
+                .frame(width: 20, height: 20)
+        } else {
+            Circle()
+                .fill(Color.white)
+                .frame(width: 26, height: 26)
+        }
+    }
+    
+    private var uploadButtonView: some View {
+        VStack {
+            Button(action: {
+                uploadVoiceProfile()
+            }) {
+                HStack {
+                    Text("uploadVoiceProfile".localized)
+                        .font(.system(size: 17, weight: .medium))
+                        .tracking(1)
+                    
+                    if isUploading {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.8)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                        .opacity(recordedSamples.isEmpty ? 0.5 : 1)
+                )
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+            }
+            .disabled(recordedSamples.isEmpty || isUploading)
+            
+            if isUploading {
+                ProgressView(value: uploadProgress, total: 1.0)
+                    .accentColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
+            }
+        }
+    }
+    
+    private var savedRecordingsView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("savedRecordings".localized)
+                .font(.system(size: 18, weight: .medium))
+                .tracking(0.5)
+                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                .padding(.horizontal, 20)
+            
+            ForEach(recordings) { recording in
+                recordingRowView(for: recording)
+            }
+        }
+        .padding(.bottom, 20)
+    }
+    
+    private func recordingRowView(for recording: Recording) -> some View {
+        HStack {
+            Image(systemName: "waveform")
+                .font(.system(size: 18))
+                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+            
+            Text(recording.name)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+            
+            Spacer()
+            
+            Text(recording.duration)
+                .font(.system(size: 14, weight: .light))
+                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+            
+            Button(action: {
+                // Play recording action
+            }) {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.02), radius: 4, x: 0, y: 2)
+        )
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Functions
+    
+    private func startRecording() {
+        // This would normally start actual audio recording
+        // For UI demo, we'll just generate random waveform data
+        recordedSamples = []
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            if isRecording {
+                if recordedSamples.count > 40 {
+                    recordedSamples.removeFirst()
+                }
+                recordedSamples.append(CGFloat.random(in: 5...70))
+            }
+        }
+        timer.fire()
+    }
+    
+    private func stopRecording() {
+        // Would normally stop recording and process audio
+    }
+    
+    private func uploadVoiceProfile() {
+        isUploading = true
+        uploadProgress = 0
+        
+        // Simulate upload progress
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+            if uploadProgress < 1.0 {
+                uploadProgress += 0.05
+            } else {
+                isUploading = false
+                timer.invalidate()
+                
+                // Add to recordings
+                let newRecording = Recording(name: "Recording \(recordings.count + 1)", duration: "0:18")
+                recordings.insert(newRecording, at: 0)
+            }
+        }
+        timer.fire()
     }
 }
 
