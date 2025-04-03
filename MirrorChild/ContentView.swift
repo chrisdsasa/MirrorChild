@@ -10,6 +10,7 @@ import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @StateObject private var screenCaptureManager = ScreenCaptureManager.shared
     
     // UI state
     @State private var showingSettings = false
@@ -17,6 +18,7 @@ struct ContentView: View {
     @State private var isMessageAnimating = false
     @State private var isMicrophoneActive = false
     @State private var isScreenSharingActive = false
+    @State private var showingScreenCapture = false
     
     // Constants
     let avatarSize: CGFloat = 160
@@ -133,6 +135,30 @@ struct ContentView: View {
                                 Animation.easeInOut(duration: 1.5)
                                     .repeatForever(autoreverses: true),
                                 value: isMicrophoneActive
+                            )
+                    }
+                    
+                    // Screen sharing indicator
+                    if isScreenSharingActive {
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color(red: 0.5, green: 0.7, blue: 0.5).opacity(0.3),
+                                        Color(red: 0.6, green: 0.8, blue: 0.6).opacity(0.3)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                            .frame(width: avatarSize + 15, height: avatarSize + 15)
+                            .scaleEffect(isScreenSharingActive ? 1.05 : 1.0)
+                            .opacity(isScreenSharingActive ? 0.8 : 0)
+                            .animation(
+                                Animation.easeInOut(duration: 1.5)
+                                    .repeatForever(autoreverses: true),
+                                value: isScreenSharingActive
                             )
                     }
                 }
@@ -255,6 +281,9 @@ struct ContentView: View {
         .sheet(isPresented: $showingSettings) {
             JapaneseStyleSettingsView()
         }
+        .sheet(isPresented: $showingScreenCapture) {
+            ScreenCaptureView()
+        }
     }
     
     // MARK: - User Actions
@@ -269,11 +298,17 @@ struct ContentView: View {
     }
     
     private func toggleScreenSharing() {
-        isScreenSharingActive.toggle()
         if isScreenSharingActive {
-            messageText = "screenOnMessage".localized
-        } else {
+            // Stop screen sharing
+            screenCaptureManager.stopCapture()
+            isScreenSharingActive = false
             messageText = "screenOffMessage".localized
+            showingScreenCapture = false
+        } else {
+            // Show screen capture UI
+            isScreenSharingActive = true
+            messageText = "screenOnMessage".localized
+            showingScreenCapture = true
         }
     }
 }

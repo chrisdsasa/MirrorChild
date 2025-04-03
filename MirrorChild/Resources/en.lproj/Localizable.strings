@@ -35,6 +35,24 @@
 "uploadVoiceProfile" = "Upload Voice Sample";
 "savedRecordings" = "Saved Recordings";
 
+/* Screen Capture screen */
+"screenCaptureTitle" = "Screen Sharing";
+"screenCaptureActive" = "Screen Sharing Active";
+"screenCaptureInactive" = "Screen Sharing Inactive";
+"startCapture" = "Start Sharing";
+"stopCapture" = "Stop Sharing";
+"tapToStartCapture" = "Tap the button below to start sharing your screen";
+"permissionRequired" = "Permission Required";
+"screenPermissionRequired" = "MirrorChild needs your permission to view and share your screen to provide assistance.";
+"requestPermission" = "Grant Permission";
+"screenPermissionDenied" = "Screen recording permission was denied. Please enable it in your device settings to use this feature.";
+"permissionNeededMessage" = "Screen permission is needed before sharing";
+"permissionDeniedMessage" = "Screen recording permission is required. Please enable in Settings.";
+"openSettings" = "Open Settings";
+"openSettingsTitle" = "Enable Screen Recording";
+"openSettingsMessage" = "To enable screen recording, please go to Settings > Privacy > Screen Recording and enable permission for MirrorChild.";
+"openSettingsButton" = "Open Settings";
+
 /* Onboarding screen */
 "welcome" = "Welcome";
 "digitalCompanion" = "Digital Companion";

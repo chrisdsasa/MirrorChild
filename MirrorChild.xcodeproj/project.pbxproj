@@ -45,16 +45,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		12ABCDEF0123456789ABCDEF /* Localization */ = {
-			isa = PBXGroup;
-			children = (
-				12ABCDEF0123456789ABCDE1 /* en.lproj */,
-				12ABCDEF0123456789ABCDE2 /* ja.lproj */,
-			);
-			path = Resources;
-			sourceTree = "<group>";
-			usesTabs = 0;
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -112,13 +102,6 @@
 			targets = (
 				6A359A5C2D9EBB6700E8BAC4 /* MirrorChild */,
 			);
-			buildSettings = {
-				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
-				INFOPLIST_KEY_CFBundleLocalizations = (
-					en,
-					ja,
-				);
-			};
 		};
 /* End PBXProject section */
 
@@ -273,6 +256,12 @@
 				DEVELOPMENT_TEAM = 6NMN2A89PD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INFOPLIST_KEY_CFBundleLocalizations = "en ja";
+				INFOPLIST_KEY_NSCameraUsageDescription = "MirrorChild needs access to your camera to assist with device problems.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MirrorChild needs access to your microphone to provide voice assistance.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "MirrorChild needs access to save screenshots during screen sharing.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MirrorChild needs access to your photo library for screen sharing functionality.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -302,6 +291,12 @@
 				DEVELOPMENT_TEAM = 6NMN2A89PD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INFOPLIST_KEY_CFBundleLocalizations = "en ja";
+				INFOPLIST_KEY_NSCameraUsageDescription = "MirrorChild needs access to your camera to assist with device problems.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MirrorChild needs access to your microphone to provide voice assistance.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "MirrorChild needs access to save screenshots during screen sharing.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MirrorChild needs access to your photo library for screen sharing functionality.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

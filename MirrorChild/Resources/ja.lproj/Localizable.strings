@@ -35,6 +35,24 @@
 "uploadVoiceProfile" = "音声サンプルをアップロード";
 "savedRecordings" = "保存された録音";
 
+/* Screen Capture screen */
+"screenCaptureTitle" = "画面共有";
+"screenCaptureActive" = "画面共有中";
+"screenCaptureInactive" = "画面共有停止中";
+"startCapture" = "共有を開始";
+"stopCapture" = "共有を停止";
+"tapToStartCapture" = "下のボタンをタップして画面共有を開始";
+"permissionRequired" = "権限が必要です";
+"screenPermissionRequired" = "ミラーチャイルドがサポートを提供するには、画面を表示および共有するための許可が必要です。";
+"requestPermission" = "許可を与える";
+"screenPermissionDenied" = "画面録画の許可が拒否されました。この機能を使用するには、デバイスの設定で有効にしてください。";
+"permissionNeededMessage" = "共有する前に画面の許可が必要です";
+"permissionDeniedMessage" = "画面録画の権限が必要です。設定で有効にしてください。";
+"openSettings" = "設定を開く";
+"openSettingsTitle" = "画面録画を有効にする";
+"openSettingsMessage" = "画面録画を有効にするには、設定 > プライバシー > 画面録画 に移動し、ミラーチャイルドの権限を有効にしてください。";
+"openSettingsButton" = "設定を開く";
+
 /* Onboarding screen */
 "welcome" = "ようこそ";
 "digitalCompanion" = "デジタルコンパニオン";
