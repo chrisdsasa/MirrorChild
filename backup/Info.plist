@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>MirrorChild needs microphone access to hear your voice and provide assistance</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>MirrorChild needs speech recognition to understand your requests</string>
+    <key>NSCameraUsageDescription</key>
+    <string>MirrorChild needs camera access to provide visual guidance</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>MirrorChild requires access to your photo library to save screenshots when needed</string>
+    <key>NSUserTrackingUsageDescription</key>
+    <string>This allows MirrorChild to provide you with a better, personalized experience</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+        <string>processing</string>
+    </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>mirrorchild</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist> 
