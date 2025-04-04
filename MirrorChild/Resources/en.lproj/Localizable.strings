@@ -40,6 +40,21 @@
 "tapToStartListening" = "Tap the button below to start voice recognition";
 "waitingForSpeech" = "Waiting for speech...";
 
+/* Voice Recording */
+"startRecording" = "Start Recording";
+"stopRecording" = "Stop Recording";
+"recordAgain" = "Record Again";
+"playRecording" = "Play";
+"pausePlayback" = "Pause";
+"recordingComplete" = "Recording Complete";
+"uploadSuccess" = "Upload Successful!";
+"confirm" = "OK";
+"permissionRequired" = "Permission Required";
+"microphonePermissionMessage" = "Microphone permission is required to record your voice. Please enable it in Settings.";
+"autoAddPunctuation" = "Auto-add punctuation";
+"recordingTime" = "%.1f sec";
+"targetRecordingTime" = "30 sec";
+
 /* Voice Language Settings */
 "voiceLanguageTitle" = "Voice Language";
 "languageSelectionPrompt" = "Select language for voice recognition";
