@@ -79,8 +79,8 @@ struct MirrorChildApp: App {
             #else
             ZStack {
                 // 确保ContentView能立即显示
-                ContentView()
-                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            ContentView()
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
                     .onAppear {
                         // 应用已启动，可以执行非关键的操作
                         print("Content view appeared")

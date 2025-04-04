@@ -20,6 +20,7 @@ extension EnvironmentValues {
 
 // 支持的语言枚举
 enum VoiceLanguage: String, CaseIterable, Identifiable {
+    case japanese = "ja-JP"
     case chinese = "zh-CN"
     case english = "en-US"
     
@@ -29,16 +30,28 @@ enum VoiceLanguage: String, CaseIterable, Identifiable {
     var localizedName: String {
         switch self {
         case .english:
-            return "英语"
+            return "English"
         case .chinese:
             return "中文"
+        case .japanese:
+            return "日本語"
         }
     }
     
-    // 默认使用中文，其次是英文
-    static var deviceDefault: VoiceLanguage {
-        // 直接返回中文作为默认选项
-        return .chinese
+    // 根据系统语言自动选择适合的语音识别语言
+    static var deviceLanguage: VoiceLanguage {
+        let preferredLanguages = Locale.preferredLanguages
+        let languageCode = Locale(identifier: preferredLanguages.first ?? "en").language.languageCode?.identifier ?? "en"
+        
+        // 根据系统语言代码选择最合适的语音识别语言
+        switch languageCode {
+        case "zh":
+            return .chinese
+        case "ja":
+            return .japanese
+        default:
+            return .english
+        }
     }
 }
 
@@ -83,20 +96,6 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         didSet {
             // 当语言改变时，更新语音识别器
             updateSpeechRecognizer()
-            // 保存用户选择
-            UserDefaults.standard.set(currentLanguage.rawValue, forKey: "selectedVoiceLanguage")
-        }
-    }
-    
-    // 扬声器模式
-    @Published var useLoudspeaker: Bool = true {
-        didSet {
-            // 保存用户选择
-            UserDefaults.standard.set(useLoudspeaker, forKey: "useLoudspeaker")
-            
-            if !isRunningInPreview {
-                updateSpeakerMode()
-            }
         }
     }
     
@@ -121,32 +120,20 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             self.permissionStatus = .authorized
             self.availableLanguages = VoiceLanguage.allCases
             
-            // 从用户默认设置中获取已保存的语言选择
-            if let savedLanguageCode = UserDefaults.standard.string(forKey: "selectedVoiceLanguage"),
-               let savedLanguage = VoiceLanguage(rawValue: savedLanguageCode) {
-                self.currentLanguage = savedLanguage
-            }
+            // 使用系统语言
+            self.currentLanguage = VoiceLanguage.deviceLanguage
             
             // 获取标点符号设置
             self.enablePunctuation = UserDefaults.standard.bool(forKey: "enablePunctuation")
             
-            // 获取扬声器设置
-            self.useLoudspeaker = UserDefaults.standard.object(forKey: "useLoudspeaker") as? Bool ?? true
-            
             return
         }
         
-        // 从用户默认设置中获取已保存的语言选择
-        if let savedLanguageCode = UserDefaults.standard.string(forKey: "selectedVoiceLanguage"),
-           let savedLanguage = VoiceLanguage(rawValue: savedLanguageCode) {
-            self.currentLanguage = savedLanguage
-        }
+        // 使用系统语言
+        self.currentLanguage = VoiceLanguage.deviceLanguage
         
         // 获取标点符号设置
         self.enablePunctuation = UserDefaults.standard.bool(forKey: "enablePunctuation")
-        
-        // 获取扬声器设置
-        self.useLoudspeaker = UserDefaults.standard.object(forKey: "useLoudspeaker") as? Bool ?? true
         
         // 初始化音频引擎
         audioEngine = AVAudioEngine()
@@ -154,11 +141,6 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         // 初始化语音识别器和检查可用语言
         updateSpeechRecognizer()
         checkAvailableLanguages()
-        
-        // 应用扬声器设置
-        if !isRunningInPreview {
-            updateSpeakerMode()
-        }
         
         // 设置应用状态监听
         setupNotifications()
@@ -277,20 +259,10 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         // 更新可用语言列表
         self.availableLanguages = supported
         
-        // 如果当前选择的语言不在支持列表中，切换到第一个可用语言
+        // 如果当前选择的语言不在支持列表中，切换到系统默认语言
         if !supported.contains(currentLanguage) {
-            currentLanguage = supported.first ?? .english
+            currentLanguage = VoiceLanguage.deviceLanguage
         }
-    }
-    
-    // 切换语言
-    func switchLanguage(to language: VoiceLanguage) {
-        guard availableLanguages.contains(language) else {
-            print("不支持的语言: \(language.localizedName)")
-            return
-        }
-        
-        currentLanguage = language
     }
     
     func checkPermissionStatus() {
@@ -387,6 +359,8 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                     self.transcribedText = "This is simulated recording text in preview mode. Actual speech-to-text results will be shown on real devices."
                 case .chinese:
                     self.transcribedText = "这是预览模式下的模拟录音文本。实际设备上会显示真实的语音转文字结果。"
+                case .japanese:
+                    self.transcribedText = "これはプレビューモードのシミュレーションレコーディングテキストです。実際のデバイスで実際の音声からテキストへの結果が表示されます。"
                 }
                 completion(true, nil)
             }
@@ -448,9 +422,10 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             // 配置音频会话
             do {
                 let audioSession = AVAudioSession.sharedInstance()
+                // 始终使用扬声器输出音频
                 try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                print("音频会话配置成功")
+                print("音频会话配置成功: 使用扬声器")
             } catch {
                 print("错误：配置音频会话失败: \(error)")
                 completion(false, error)
@@ -583,32 +558,5 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             audioEngine?.stop()
             audioEngine?.inputNode.removeTap(onBus: 0)
         }
-    }
-    
-    // 更新扬声器模式
-    func updateSpeakerMode() {
-        guard !isRunningInPreview else { return }
-        
-        do {
-            let audioSession = AVAudioSession.sharedInstance()
-            
-            if useLoudspeaker {
-                // 使用扬声器
-                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
-            } else {
-                // 使用听筒
-                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
-            }
-            
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            print("扬声器模式已更新: \(useLoudspeaker ? "扬声器" : "听筒")")
-        } catch {
-            print("更新扬声器模式失败: \(error)")
-        }
-    }
-    
-    // 切换扬声器模式
-    func toggleSpeakerMode() {
-        useLoudspeaker.toggle()
     }
 } 

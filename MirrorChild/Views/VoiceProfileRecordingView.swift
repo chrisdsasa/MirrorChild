@@ -16,372 +16,243 @@ struct VoiceProfileRecordingView: View {
     @State private var audioRecorder: AVAudioRecorder?
     @State private var audioPlayer: AVAudioPlayer?
     @State private var recordingURL: URL?
+    @State private var player: AVAudioPlayer?
+    @State private var isUploading = false
+    @State private var uploadSuccess = false
+    @State private var alertMessage = ""
+    @State private var permissionStatus: AVAudioSession.RecordPermission = .undetermined
     
     // 常量
     private let maxRecordingTime: TimeInterval = 30 // 30秒录音
     private let targetSampleTime = "targetRecordingTime".localized // 目标样本时间
     private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     
+    // 检查30秒是否完成
+    private var isRecordingComplete: Bool {
+        return recordingTime >= 29.5
+    }
+    
+    // 进度百分比
+    private var progressPercentage: Double {
+        return min(recordingTime / 30.0, 1.0)
+    }
+    
     var body: some View {
         ZStack {
             // 背景
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.97, green: 0.97, blue: 0.98),
-                    Color(red: 0.96, green: 0.96, blue: 0.98),
-                    Color(red: 0.95, green: 0.95, blue: 0.98)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            ).ignoresSafeArea()
+            Color(red: 0.97, green: 0.97, blue: 0.98)
+                .ignoresSafeArea()
             
-            // 樱花装饰元素（微妙）
-            GeometryReader { geometry in
-                ZStack {
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(Color.pink.opacity(0.2))
-                        .position(x: geometry.size.width - 40, y: 60)
-                    
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(Color.pink.opacity(0.15))
-                        .position(x: 30, y: geometry.size.height - 100)
-                }
-            }
-            
-            VStack(spacing: 25) {
+            VStack(spacing: 30) {
                 // 标题
-                HStack {
-                    Text("voiceProfileTitle".localized)
-                        .font(.system(size: 24, weight: .medium))
-                        .tracking(1)
-                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        if isRecording {
-                            stopRecording()
-                        }
-                        dismiss()
-                    }) {
-                        Text("doneButton".localized)
-                            .font(.system(size: 16, weight: .medium))
-                            .tracking(1)
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 15)
-                            .background(
-                                Capsule()
-                                    .stroke(Color(red: 0.5, green: 0.5, blue: 0.7).opacity(0.3), lineWidth: 1)
-                            )
-                    }
-                }
-                .padding(.top, 20)
-                .padding(.horizontal)
+                Text("声音录制")
+                    .font(.system(size: 32, weight: .medium))
+                    .tracking(2)
+                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
+                    .padding(.top, 30)
                 
-                // 说明文本
-                Text("voiceProfileInstructions".localized)
-                    .font(.system(size: 16))
-                    .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 25)
+                Spacer()
                 
-                // 录音可视化和进度
-                ZStack {
-                    // 进度条背景
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white.opacity(0.9))
-                        .frame(height: 200)
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.3), lineWidth: 1)
-                        )
-                    
-                    VStack(spacing: 20) {
-                        // 声波可视化
-                        if isRecording {
-                            waveformView
-                        } else if recordingURL != nil {
-                            // 已录制完成的状态
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(Color(red: 0.4, green: 0.7, blue: 0.5))
-                        } else {
-                            // 未开始录制的状态
-                            Image(systemName: "mic.circle")
-                                .font(.system(size: 40))
-                                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                        }
+                // 波形视图
+                waveformView
+                    .padding(.horizontal, 20)
+                    .opacity(isRecording || isPlayingBack ? 1 : 0.3)
+                
+                // 进度和时间信息
+                VStack(spacing: 15) {
+                    // 进度条
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(red: 0.9, green: 0.9, blue: 0.95))
+                            .frame(height: 8)
                         
-                        // 进度指示器
-                        VStack(spacing: 8) {
-                            // 进度条
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .fill(Color(red: 0.9, green: 0.9, blue: 0.95))
-                                        .frame(height: 10)
-                                    
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .fill(
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [
-                                                    Color(red: 0.5, green: 0.5, blue: 0.8),
-                                                    Color(red: 0.6, green: 0.5, blue: 0.8)
-                                                ]),
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                        .frame(width: geometry.size.width * recordingProgress, height: 10)
-                                }
-                            }
-                            .frame(height: 10)
-                            
-                            // 时间指示器
-                            HStack {
-                                Text(String(format: "recordingTime".localized, recordingTime))
-                                    .font(.system(size: 14))
-                                    .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
-                                
-                                Spacer()
-                                
-                                Text(targetSampleTime)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
-                            }
-                        }
-                        .padding(.horizontal, 20)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(isRecordingComplete ? 
+                                  Color(red: 0.4, green: 0.7, blue: 0.5) : 
+                                  Color(red: 0.5, green: 0.5, blue: 0.8))
+                            .frame(width: max(CGFloat(progressPercentage) * UIScreen.main.bounds.width - 40, 0), 
+                                   height: 8)
                     }
-                    .padding(.vertical, 20)
+                    
+                    // 时间文本
+                    Text(String(format: "%.0f 秒", min(recordingTime, 30)))
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
                 }
                 .padding(.horizontal, 20)
                 
-                // 按钮区域
-                VStack(spacing: 15) {
-                    // 录制/播放控制
-                    HStack(spacing: 30) {
-                        if recordingURL != nil && !isRecording {
-                            // 播放按钮
-                            Button(action: togglePlayback) {
-                                HStack {
-                                    Image(systemName: isPlayingBack ? "pause.fill" : "play.fill")
-                                        .font(.system(size: 15))
-                                    Text(isPlayingBack ? "pausePlayback".localized : "playRecording".localized)
-                                        .font(.system(size: 16))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.vertical, 12)
-                                .padding(.horizontal, 20)
-                                .background(
-                                    Capsule()
-                                        .fill(Color(red: 0.5, green: 0.7, blue: 0.5))
-                                )
-                                .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
-                            }
-                            
-                            // 重新录制按钮
-                            Button(action: resetRecording) {
-                                HStack {
-                                    Image(systemName: "arrow.counterclockwise")
-                                        .font(.system(size: 15))
-                                    Text("recordAgain".localized)
-                                        .font(.system(size: 16))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.vertical, 12)
-                                .padding(.horizontal, 20)
-                                .background(
-                                    Capsule()
-                                        .fill(Color(red: 0.7, green: 0.5, blue: 0.5))
-                                )
-                                .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
-                            }
-                        } else {
-                            // 录制按钮
-                            Button(action: toggleRecording) {
-                                HStack {
-                                    Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                                        .font(.system(size: 15))
-                                    Text(isRecording ? "stopRecording".localized : "startRecording".localized)
-                                        .font(.system(size: 16))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.vertical, 12)
-                                .padding(.horizontal, 20)
-                                .background(
-                                    Capsule()
-                                        .fill(isRecording ? Color(red: 0.8, green: 0.4, blue: 0.4) : Color(red: 0.5, green: 0.5, blue: 0.8))
-                                )
-                                .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
+                Spacer()
+                
+                // 录制/播放控制
+                recordingControlButtons
+                    .padding(.bottom, 20)
+                
+                // 上传按钮
+                uploadButton
+                    .padding(.bottom, 40)
+            }
+            .padding(.horizontal)
+            
+            // 关闭按钮
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.7))
+                            .padding(20)
+                    }
+                }
+                Spacer()
+            }
+        }
+        .onAppear {
+            checkPermission()
+        }
+        .onReceive(timer) { _ in
+            updateTimer()
+        }
+        .alert(isPresented: $showingPermissionAlert) {
+            Alert(
+                title: Text("错误"),
+                message: Text(alertMessage),
+                dismissButton: .default(Text("确定"))
+            )
+        }
+    }
+    
+    // 录制控制按钮
+    private var recordingControlButtons: some View {
+        Group {
+            if recordingURL != nil && !isRecording {
+                HStack(spacing: 40) {
+                    // 播放按钮
+                    Button(action: togglePlayback) {
+                        VStack {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 0.5, green: 0.7, blue: 0.5))
+                                    .frame(width: 80, height: 80)
+                                    .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
+                                
+                                Image(systemName: isPlayingBack ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.white)
                             }
                         }
                     }
                     
-                    // 上传按钮 - 只在有录音且未正在录制时显示
-                    if recordingURL != nil && !isRecording {
-                        Button(action: uploadRecording) {
-                            HStack {
-                                Image(systemName: "arrow.up.circle")
-                                    .font(.system(size: 15))
-                                Text("uploadVoiceProfile".localized)
-                                    .font(.system(size: 16))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.vertical, 12)
-                            .frame(width: 220)
-                            .background(
-                                Capsule()
-                                    .fill(Color(red: 0.4, green: 0.6, blue: 0.8))
-                            )
-                            .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
-                        }
-                    }
-                }
-                .padding(.top, 10)
-                
-                Spacer()
-            }
-            .padding()
-            
-            // 上传成功提示
-            if showingUploadSuccess {
-                Color.black.opacity(0.4)
-                    .ignoresSafeArea()
-                    .overlay(
-                        VStack(spacing: 20) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 50))
-                                .foregroundColor(.green)
-                            
-                            Text("uploadSuccess".localized)
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .fontWeight(.medium)
-                            
-                            Button(action: {
-                                withAnimation {
-                                    showingUploadSuccess = false
-                                }
-                                // 上传成功后返回前一个界面
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    dismiss()
-                                }
-                            }) {
-                                Text("confirm".localized)
-                                    .font(.headline)
+                    // 重新录制按钮
+                    Button(action: resetRecording) {
+                        VStack {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.5))
+                                    .frame(width: 80, height: 80)
+                                    .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
+                                
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 30))
                                     .foregroundColor(.white)
-                                    .padding(.vertical, 10)
-                                    .padding(.horizontal, 30)
-                                    .background(Capsule().fill(Color.blue))
                             }
                         }
-                        .padding(30)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color(white: 0.2))
-                        )
-                        .padding(30)
-                    )
-                    .transition(.opacity)
-            }
-        }
-        .onAppear {
-            checkMicrophonePermission()
-            setupAudioSession()
-        }
-        .onDisappear {
-            stopRecording()
-            stopPlayback()
-        }
-        .onReceive(timer) { _ in
-            if isRecording {
-                recordingTime += 0.1
-                recordingProgress = min(recordingTime / maxRecordingTime, 1.0)
-                
-                // 达到最大录制时间时自动停止
-                if recordingTime >= maxRecordingTime {
-                    stopRecording()
+                    }
+                }
+            } else {
+                // 录制按钮
+                Button(action: toggleRecording) {
+                    ZStack {
+                        Circle()
+                            .fill(isRecording ? Color(red: 0.8, green: 0.4, blue: 0.4) : Color(red: 0.5, green: 0.5, blue: 0.8))
+                            .frame(width: 100, height: 100)
+                            .shadow(color: Color.black.opacity(0.15), radius: 5, x: 0, y: 3)
+                        
+                        Image(systemName: isRecording ? "stop.fill" : "mic.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white)
+                    }
                 }
             }
         }
-        .alert(isPresented: $showingPermissionAlert) {
-            Alert(
-                title: Text("permissionRequired".localized),
-                message: Text("microphonePermissionMessage".localized),
-                primaryButton: .default(Text("openSettingsButton".localized)) {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
+    }
+    
+    // 上传按钮
+    private var uploadButton: some View {
+        Group {
+            if recordingURL != nil && !isRecording {
+                Button(action: uploadRecording) {
+                    ZStack {
+                        Capsule()
+                            .fill(Color(red: 0.4, green: 0.6, blue: 0.8))
+                            .frame(height: 60)
+                            .shadow(color: Color.black.opacity(0.15), radius: 5, x: 0, y: 3)
+                        
+                        HStack(spacing: 15) {
+                            Image(systemName: uploadSuccess ? "checkmark.circle" : "arrow.up.circle")
+                                .font(.system(size: 26))
+                            
+                            Text(uploadSuccess ? "已上传" : "上传声音")
+                                .font(.system(size: 24, weight: .medium))
+                        }
+                        .foregroundColor(.white)
                     }
-                },
-                secondaryButton: .cancel()
-            )
+                    .frame(width: 250)
+                }
+                .disabled(uploadSuccess)
+                .opacity(uploadSuccess ? 0.7 : 1)
+            }
         }
     }
     
     // 波形视图 - 模拟音频波形
     private var waveformView: some View {
         GeometryReader { geometry in
-            HStack(spacing: 3) {
-                ForEach(0..<Int(geometry.size.width / 6), id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 1.5)
+            HStack(spacing: 4) {
+                ForEach(0..<Int(geometry.size.width / 8), id: \.self) { index in
+                    Capsule()
                         .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
-                        .frame(width: 3, height: getWaveHeight(at: index, width: geometry.size.width))
+                        .frame(width: 6, height: getWaveHeight(at: index, width: geometry.size.width))
                         .animation(
-                            Animation.easeInOut(duration: 0.2)
+                            Animation.easeInOut(duration: 0.3)
                                 .repeatForever()
-                                .delay(Double(index) * 0.01),
+                                .delay(Double(index) * 0.05),
                             value: isRecording
                         )
                 }
             }
-            .frame(height: 80)
+            .frame(height: 120)
         }
-        .frame(height: 80)
+        .frame(height: 120)
     }
     
     // 生成波形高度
     private func getWaveHeight(at index: Int, width: CGFloat) -> CGFloat {
         let baseHeight: CGFloat = 20
-        let maxAdditionalHeight: CGFloat = 60
+        let maxAdditionalHeight: CGFloat = 100
         let seed = Date().timeIntervalSince1970 + Double(index)
-        let randomFactor = sin(seed) * 0.5 + 0.5 // 0.0-1.0
+        let randomFactor = sin(seed * 2) * 0.5 + 0.5 // 0.0-1.0
         
         return baseHeight + randomFactor * maxAdditionalHeight
     }
     
     // 检查麦克风权限
-    private func checkMicrophonePermission() {
-        switch AVAudioSession.sharedInstance().recordPermission {
-        case .denied:
+    private func checkPermission() {
+        permissionStatus = AVAudioSession.sharedInstance().recordPermission
+        if permissionStatus == .denied {
             showingPermissionAlert = true
-        case .undetermined:
+            alertMessage = "microphonePermissionMessage".localized
+        } else if permissionStatus == .undetermined {
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 if !granted {
                     DispatchQueue.main.async {
-                        showingPermissionAlert = true
+                        self.showingPermissionAlert = true
+                        self.alertMessage = "microphonePermissionMessage".localized
                     }
                 }
             }
-        case .granted:
-            // 已授权，可以继续
-            break
-        @unknown default:
-            break
-        }
-    }
-    
-    // 设置音频会话
-    private func setupAudioSession() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: .defaultToSpeaker)
-            try session.setActive(true)
-        } catch {
-            print("设置音频会话失败: \(error)")
         }
     }
     
@@ -482,6 +353,18 @@ struct VoiceProfileRecordingView: View {
                 withAnimation {
                     showingUploadSuccess = true
                 }
+            }
+        }
+    }
+    
+    private func updateTimer() {
+        if isRecording {
+            recordingTime += 0.1
+            recordingProgress = min(recordingTime / maxRecordingTime, 1.0)
+            
+            // 达到最大录制时间时自动停止
+            if recordingTime >= maxRecordingTime {
+                stopRecording()
             }
         }
     }

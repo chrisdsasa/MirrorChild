@@ -107,37 +107,6 @@ struct VoiceCaptureView: View {
                         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                 )
                 
-                // Language indicator
-                if voiceCaptureManager.isRecording {
-                    HStack {
-                        Text("[\(voiceCaptureManager.currentLanguage.localizedName)]")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                        
-                        Spacer()
-                        
-                        // Language change button
-                        Button(action: {
-                            showLanguageSelection()
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 12))
-                                Text("switchLanguage".localized)
-                                    .font(.system(size: 14))
-                            }
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 10)
-                            .background(
-                                Capsule()
-                                    .stroke(Color(red: 0.5, green: 0.5, blue: 0.7).opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                
                 // Transcription area
                 VStack {
                     if voiceCaptureManager.isRecording || !voiceCaptureManager.transcribedText.isEmpty {
@@ -161,38 +130,7 @@ struct VoiceCaptureView: View {
                 .padding(.horizontal, 20)
                 
                 // Control buttons
-                HStack(spacing: 30) {
-                    if voiceCaptureManager.isRecording {
-                        // Stop button
-                        Button(action: stopRecording) {
-                            Text("stopListening".localized)
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundColor(.white)
-                                .padding(.vertical, 14)
-                                .padding(.horizontal, 30)
-                                .background(
-                                    Capsule()
-                                        .fill(Color(red: 0.8, green: 0.4, blue: 0.4))
-                                )
-                                .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
-                        }
-                    } else {
-                        // Start button
-                        Button(action: startRecording) {
-                            Text("startListening".localized)
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundColor(.white)
-                                .padding(.vertical, 14)
-                                .padding(.horizontal, 30)
-                                .background(
-                                    Capsule()
-                                        .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
-                                )
-                                .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
-                        }
-                    }
-                }
-                .padding(.top, 20)
+                mainControlButton
                 
                 // Open settings button (if permission denied)
                 if voiceCaptureManager.permissionStatus == .denied {
@@ -231,81 +169,66 @@ struct VoiceCaptureView: View {
         }
     }
     
+    // 转录视图
     private var transcriptionView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                if voiceCaptureManager.isRecording {
-                    HStack {
-                        Text("listeningMessage".localized)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color(red: 0.4, green: 0.6, blue: 0.5))
-                        
-                        // Animated dots
-                        HStack(spacing: 3) {
-                            ForEach(0..<3) { index in
-                                Circle()
-                                    .fill(Color(red: 0.4, green: 0.6, blue: 0.5))
-                                    .frame(width: 5, height: 5)
-                                    .opacity(0.5)
-                                    .animation(
-                                        Animation.easeInOut(duration: 0.5)
-                                            .repeatForever()
-                                            .delay(0.2 * Double(index)),
-                                        value: voiceCaptureManager.isRecording
-                                    )
-                            }
-                        }
-                    }
-                    .padding(.bottom, 5)
-                    
-                    // 显示当前使用的语言
-                    Text("[\(voiceCaptureManager.currentLanguage.localizedName)]")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                        .padding(.bottom, 5)
-                        
-                    // 背景录音指示器
-                    if UIApplication.shared.applicationState == .background && voiceCaptureManager.isRecording {
-                        Text("(后台录音中...)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color.orange)
-                            .padding(.bottom, 5)
-                    }
-                }
-                
-                // Preview mode shows simulated text
-                if isRunningInPreview && voiceCaptureManager.isRecording {
-                    Text("This is simulated speech recognition text in preview mode. Actual speech-to-text content will be shown on real devices.")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
-                        .lineSpacing(5)
-                } else {
-                    Text(voiceCaptureManager.transcribedText)
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
-                        .lineSpacing(5)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
+            Text(voiceCaptureManager.transcribedText)
+                .font(.system(size: 24))
+                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
+                .padding()
+                .textSelection(.enabled)
         }
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.9))
+                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
+        )
     }
     
+    // 主控制按钮
+    private var mainControlButton: some View {
+        Button(action: {
+            if voiceCaptureManager.isRecording {
+                stopRecording()
+            } else {
+                startRecording()
+            }
+        }) {
+            ZStack {
+                Circle()
+                    .fill(
+                        voiceCaptureManager.isRecording ? 
+                        Color(red: 0.8, green: 0.4, blue: 0.4) : 
+                        Color(red: 0.5, green: 0.5, blue: 0.8)
+                    )
+                    .frame(width: 100, height: 100)
+                    .shadow(color: Color.black.opacity(0.15), radius: 5, x: 0, y: 3)
+                
+                Image(systemName: voiceCaptureManager.isRecording ? "stop.fill" : "mic.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.white)
+            }
+        }
+        .padding(.bottom, 30)
+    }
+    
+    // 空状态视图
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Image(systemName: "waveform")
-                .font(.system(size: 60))
+                .font(.system(size: 80))
                 .foregroundColor(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.5))
             
             if voiceCaptureManager.permissionStatus == .denied {
                 Text("permissionDeniedMessage".localized)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 24, weight: .medium))
                     .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             } else {
                 Text("tapToStartListening".localized)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 24, weight: .medium))
                     .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -337,15 +260,6 @@ struct VoiceCaptureView: View {
         }
         
         voiceCaptureManager.stopRecording()
-    }
-    
-    private func showLanguageSelection() {
-        // This would normally show a sheet with language selection
-        // For now we'll just cycle through available languages
-        if let currentIndex = voiceCaptureManager.availableLanguages.firstIndex(of: voiceCaptureManager.currentLanguage) {
-            let nextIndex = (currentIndex + 1) % voiceCaptureManager.availableLanguages.count
-            voiceCaptureManager.switchLanguage(to: voiceCaptureManager.availableLanguages[nextIndex])
-        }
     }
 }
 

@@ -25,6 +25,15 @@ struct ContentView: View {
     // Constants
     let avatarSize: CGFloat = 160
     
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var selectedVoice = "shimmer"
+    @State private var personalityTraits: [String] = ["calmTrait".localized, "kindTrait".localized, "helpfulTrait".localized]
+    @State private var showingVoiceRecordingPage = false
+    @ObservedObject private var voiceCaptureManager = VoiceCaptureManager.shared
+    
+    let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
+    
     var body: some View {
         ZStack {
             // Subtle gradient background inspired by Japanese dawn (Akebono)
@@ -279,6 +288,9 @@ struct ContentView: View {
         .sheet(isPresented: $showingVoiceCapture) {
             VoiceCaptureView()
         }
+        .sheet(isPresented: $showingVoiceRecordingPage) {
+            VoiceProfileRecordingView()
+        }
     }
     
     // MARK: - User Actions
@@ -350,12 +362,10 @@ struct ContentView: View {
 struct JapaneseStyleSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     
+    @StateObject private var voiceCaptureManager = VoiceCaptureManager.shared
+    @State private var showingVoiceRecordingPage = false
     @State private var selectedVoice = "shimmer"
     @State private var personalityTraits: [String] = ["calmTrait".localized, "kindTrait".localized, "helpfulTrait".localized]
-    @State private var showingVoiceProfilePage = false
-    @State private var showingLanguageSelectionPage = false
-    @State private var showingVoiceRecordingPage = false
-    @ObservedObject private var voiceCaptureManager = VoiceCaptureManager.shared
     
     let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
 
@@ -367,75 +377,10 @@ struct JapaneseStyleSettingsView: View {
                 
                 ScrollView {
                     VStack(spacing: 30) {
-                        // Voice language selection
-                        VStack(alignment: .leading, spacing: 15) {
-                            Text("voiceLanguageTitle".localized)
-                                .font(.system(size: 18, weight: .medium))
-                                .tracking(1)
-                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                                .padding(.leading, 10)
-                            
-                            Button(action: {
-                                showingLanguageSelectionPage = true
-                            }) {
-                                HStack {
-                                    Text(voiceCaptureManager.currentLanguage.localizedName)
-                                        .font(.system(size: 16))
-                                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
-                                }
-                                .padding(15)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                                )
-                            }
-                            .padding(.horizontal, 10)
-                        }
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 15)
-                        
-                        // 扬声器设置
-                        VStack(alignment: .leading, spacing: 15) {
-                            Text("音声出力".localized)
-                                .font(.system(size: 18, weight: .medium))
-                                .tracking(1)
-                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                                .padding(.leading, 10)
-                            
-                            HStack {
-                                Text(voiceCaptureManager.useLoudspeaker ? "スピーカー" : "イヤホン")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
-                                
-                                Spacer()
-                                
-                                Toggle("", isOn: $voiceCaptureManager.useLoudspeaker)
-                                    .labelsHidden()
-                                    .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.5, green: 0.5, blue: 0.8)))
-                            }
-                            .padding(15)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.white)
-                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                            )
-                            .padding(.horizontal, 10)
-                        }
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 15)
-                        
                         // Voice profile section
                         VStack(alignment: .leading, spacing: 15) {
-                            Text("voiceProfileLabel".localized)
-                                .font(.system(size: 18, weight: .medium))
-                                .tracking(1)
+                            Text("声音设置")
+                                .font(.system(size: 28, weight: .medium))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                 .padding(.leading, 10)
                             
@@ -443,25 +388,38 @@ struct JapaneseStyleSettingsView: View {
                             Button(action: {
                                 showingVoiceRecordingPage = true
                             }) {
-                                HStack {
-                                    Text("voiceProfileInstructions".localized)
-                                        .font(.system(size: 16))
-                                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(.leading)
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "mic.circle")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
-                                }
-                                .padding(15)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 20)
                                         .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                                )
+                                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                                        .frame(height: 120)
+                                    
+                                    HStack {
+                                        Image(systemName: "mic.circle.fill")
+                                            .font(.system(size: 50))
+                                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                                            .padding(.leading, 20)
+                                        
+                                        VStack(alignment: .leading) {
+                                            Text("录制声音")
+                                                .font(.system(size: 24, weight: .medium))
+                                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
+                                                .padding(.bottom, 5)
+                                            
+                                            Text("创建个性化声音")
+                                                .font(.system(size: 18))
+                                                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                                        }
+                                        .padding(.leading, 10)
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 22))
+                                            .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                            .padding(.trailing, 20)
+                                    }
+                                }
                             }
                             .padding(.horizontal, 10)
                         }
@@ -483,8 +441,8 @@ struct JapaneseStyleSettingsView: View {
                                         .tag(voice)
                                 }
                             }
-                            .pickerStyle(.wheel)
-                            .frame(height: 100)
+                            .pickerStyle(.segmented)
+                            .padding(15)
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
                                     .fill(Color.white)
@@ -529,6 +487,41 @@ struct JapaneseStyleSettingsView: View {
                                     .fill(Color.white)
                                     .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                             )
+                            .padding(.horizontal, 10)
+                        }
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 15)
+                        
+                        // Punctuation toggle setting
+                        VStack(alignment: .leading, spacing: 15) {
+                            Button(action: {
+                                voiceCaptureManager.enablePunctuation.toggle()
+                            }) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                                        .frame(height: 100)
+                                    
+                                    HStack {
+                                        Image(systemName: voiceCaptureManager.enablePunctuation ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(voiceCaptureManager.enablePunctuation ? 
+                                                           Color(red: 0.4, green: 0.7, blue: 0.5) : 
+                                                           Color(red: 0.7, green: 0.7, blue: 0.8))
+                                            .padding(.leading, 20)
+                                        
+                                        VStack(alignment: .leading) {
+                                            Text("自动标点")
+                                                .font(.system(size: 24, weight: .medium))
+                                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
+                                        }
+                                        .padding(.leading, 10)
+                                        
+                                        Spacer()
+                                    }
+                                }
+                            }
                             .padding(.horizontal, 10)
                         }
                         .padding(.vertical, 5)
@@ -582,12 +575,6 @@ struct JapaneseStyleSettingsView: View {
                             )
                     }
                 }
-            }
-            .sheet(isPresented: $showingVoiceProfilePage) {
-                VoiceProfileView()
-            }
-            .sheet(isPresented: $showingLanguageSelectionPage) {
-                VoiceLanguageSelectionView()
             }
             .sheet(isPresented: $showingVoiceRecordingPage) {
                 VoiceProfileRecordingView()
