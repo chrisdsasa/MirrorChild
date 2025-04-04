@@ -1,8 +1,9 @@
 import Foundation
 import UIKit
 import Combine
+import AVFoundation
 
-class OpenAIService {
+class OpenAIService: NSObject {
     static let shared = OpenAIService()
     
     // 定义错误类型
@@ -40,8 +41,12 @@ class OpenAIService {
     // 响应回调 - 外部可以设置这个回调来接收实时API响应
     var onNewResponse: ((String) -> Void)?
     
+    // 音频播放器
+    private var audioPlayer: AVAudioPlayer?
+    
     // 初始化时设置观察者
-    private init() {
+    private override init() {
+        super.init()
         setupObservers()
     }
     
@@ -118,8 +123,8 @@ class OpenAIService {
         }
         
         // 获取当前的截图和文本
-        let screenCaptureManager = ScreenCaptureManager.shared
-        let voiceCaptureManager = VoiceCaptureManager.shared
+        let screenCaptureManager: ScreenCaptureManager = ScreenCaptureManager.shared
+        let voiceCaptureManager: VoiceCaptureManager = VoiceCaptureManager.shared
         
         // 确保至少一种录制在进行中
         if !screenCaptureManager.isRecording && !voiceCaptureManager.isRecording {
@@ -352,6 +357,17 @@ class OpenAIService {
                    let text = textOutput["text"] as? String {
                     
                     print("OpenAI仅文本模式响应成功! 输出文本:\n\(text)")
+                    
+                    // 使用TTS朗读响应文本
+                    self.textToSpeech(text: text) { ttsResult in
+                        switch ttsResult {
+                        case .success:
+                            print("TTS朗读成功")
+                        case .failure(let ttsError):
+                            print("TTS朗读失败: \(ttsError.localizedDescription)")
+                        }
+                    }
+                    
                     completion(.success(text))
                 } else {
                     // 尝试获取错误信息
@@ -568,6 +584,16 @@ class OpenAIService {
                     // 记录完整响应到控制台，以便调试
                     print("OpenAI响应成功! 输出文本:\n\(text)")
                     
+                    // 使用TTS朗读响应文本
+                    self.textToSpeech(text: text) { ttsResult in
+                        switch ttsResult {
+                        case .success:
+                            print("TTS朗读成功")
+                        case .failure(let ttsError):
+                            print("TTS朗读失败: \(ttsError.localizedDescription)")
+                        }
+                    }
+                    
                     completion(.success(text))
                 } else {
                     // 尝试获取错误信息
@@ -623,10 +649,167 @@ class OpenAIService {
                                          userInfo: [NSLocalizedDescriptionKey: "语音文件上传功能尚未实现"])
         completion(.failure(notImplementedError))
     }
+    
+    // 将文本转换为语音
+    func textToSpeech(text: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        // 验证API密钥
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            let error = NSError(domain: "com.mirrochild.openai", 
+                               code: 1, 
+                               userInfo: [NSLocalizedDescriptionKey: "OpenAI API密钥未设置"])
+            completion(.failure(error))
+            return
+        }
+        
+        // 创建请求URL
+        guard let url = URL(string: "https://api.openai.com/v1/audio/speech") else {
+            let error = NSError(domain: "com.mirrochild.openai", 
+                               code: 3, 
+                               userInfo: [NSLocalizedDescriptionKey: "无效的TTS API URL"])
+            completion(.failure(error))
+            return
+        }
+        
+        // 创建请求
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // 设置TTS参数
+        let parameters: [String: Any] = [
+            "model": "tts-1",
+            "voice": "alloy", // 可选: alloy, echo, fable, onyx, nova, shimmer
+            "input": text,
+            "response_format": "mp3",
+            "speed": 1.0 // 语速，范围0.25-4.0
+        ]
+        
+        // 序列化请求体
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: parameters)
+        } catch {
+            let serializationError = NSError(domain: "com.mirrochild.openai", 
+                                           code: 8, 
+                                           userInfo: [NSLocalizedDescriptionKey: "序列化TTS请求体失败: \(error.localizedDescription)"])
+            completion(.failure(serializationError))
+            return
+        }
+        
+        print("开始发送TTS请求...")
+        
+        // 发送请求并获取音频数据
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                let networkError = NSError(domain: "com.mirrochild.openai", 
+                                          code: 9, 
+                                          userInfo: [NSLocalizedDescriptionKey: "TTS网络请求错误: \(error.localizedDescription)"])
+                DispatchQueue.main.async {
+                    completion(.failure(networkError))
+                }
+                return
+            }
+            
+            guard let data = data else {
+                let noDataError = NSError(domain: "com.mirrochild.openai", 
+                                         code: 4, 
+                                         userInfo: [NSLocalizedDescriptionKey: "没有接收到TTS响应数据"])
+                DispatchQueue.main.async {
+                    completion(.failure(noDataError))
+                }
+                return
+            }
+            
+            // 收到音频数据，准备播放
+            print("收到TTS响应，音频数据大小: \(data.count)字节")
+            
+            // 播放音频
+            DispatchQueue.main.async {
+                self.playAudio(data: data, completion: completion)
+            }
+        }
+        
+        task.resume()
+    }
+    
+    // 播放音频数据
+    private func playAudio(data: Data, completion: @escaping (Result<Void, Error>) -> Void) {
+        do {
+            // 通知VoiceCaptureManager暂停录音
+            NotificationCenter.default.post(name: .willPlayTTS, object: nil)
+            
+            // 等待一小段时间让录音停止
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
+                
+                do {
+                    // 创建音频播放器
+                    self.audioPlayer = try AVAudioPlayer(data: data)
+                    
+                    // 设置音频会话，允许混音和播放
+                    let audioSession = AVAudioSession.sharedInstance()
+                    try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
+                    try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                    
+                    // 设置播放完成回调
+                    self.audioPlayer?.delegate = self
+                    self.audioPlayer?.volume = 1.0
+                    
+                    // 开始播放
+                    if self.audioPlayer?.play() == true {
+                        print("开始播放TTS音频")
+                        completion(.success(()))
+                    } else {
+                        let playError = NSError(domain: "com.mirrochild.openai", 
+                                              code: 10, 
+                                              userInfo: [NSLocalizedDescriptionKey: "无法播放TTS音频"])
+                        completion(.failure(playError))
+                    }
+                } catch {
+                    let audioError = NSError(domain: "com.mirrochild.openai", 
+                                           code: 11, 
+                                           userInfo: [NSLocalizedDescriptionKey: "音频播放初始化错误: \(error.localizedDescription)"])
+                    completion(.failure(audioError))
+                }
+            }
+        } catch {
+            let audioError = NSError(domain: "com.mirrochild.openai", 
+                                   code: 11, 
+                                   userInfo: [NSLocalizedDescriptionKey: "音频播放初始化错误: \(error.localizedDescription)"])
+            completion(.failure(audioError))
+        }
+    }
 }
 
 // 添加通知名称扩展
 extension Notification.Name {
     static let didStartRecording = Notification.Name("didStartRecording")
     static let didStopRecording = Notification.Name("didStopRecording")
+    static let willPlayTTS = Notification.Name("willPlayTTS") // 新增的通知
+}
+
+// 添加AVAudioPlayerDelegate扩展
+extension OpenAIService: AVAudioPlayerDelegate {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        print("TTS音频播放结束")
+        
+        // 清理资源
+        self.audioPlayer = nil
+        
+        // 恢复音频会话（如果需要）
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            // 通知录音可以恢复（如果需要）
+            NotificationCenter.default.post(name: .didFinishPlayingTTS, object: nil)
+        } catch {
+            print("重置音频会话时出错: \(error.localizedDescription)")
+        }
+    }
+}
+
+// 新增通知名称
+extension Notification.Name {
+    static let didFinishPlayingTTS = Notification.Name("didFinishPlayingTTS")
 } 
