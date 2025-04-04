@@ -1,78 +1,82 @@
 /* Main screen */
-"appTitle" = "镜像助手";
-"settingsButton" = "设置";
-"selectPrompt" = "请选择";
-"voiceButtonLabel" = "语音";
-"screenButtonLabel" = "屏幕";
-"voiceButtonA11y" = "语音按钮";
-"voiceButtonA11yHint" = "点击激活语音助手";
-"screenButtonA11y" = "屏幕按钮";
-"screenButtonA11yHint" = "点击激活屏幕分享";
+"appTitle" = "MirrorChild";
+"settingsButton" = "Settings";
+"selectPrompt" = "Please select";
+"voiceButtonLabel" = "Voice";
+"screenButtonLabel" = "Screen";
+"voiceButtonA11y" = "Voice Button";
+"voiceButtonA11yHint" = "Tap to activate voice assistance";
+"screenButtonA11y" = "Screen Button";
+"screenButtonA11yHint" = "Tap to activate screen assistance";
 
 /* Voice feedback messages */
-"initialGreeting" = "您好！我在这里帮助您使用您的设备。";
-"listeningMessage" = "能听到我说话吗？我正在聆听您的声音。";
-"voiceOffMessage" = "语音助手已关闭。";
-"screenOnMessage" = "我现在可以看到您的屏幕。";
-"screenOffMessage" = "屏幕分享已停止。";
-"voiceErrorMessage" = "语音识别出现错误，请重试。";
+"initialGreeting" = "Hello! I'm here to assist you with your device.";
+"listeningMessage" = "Listening...";
+"voiceOffMessage" = "Voice assistance is off.";
+"screenOnMessage" = "I can see your screen now.";
+"screenOffMessage" = "Screen sharing is stopped.";
+"voiceErrorMessage" = "There was an error with voice recognition. Please try again.";
 
 /* Settings screen */
-"settingsTitle" = "设置";
-"voiceTypeLabel" = "语音类型";
-"voiceProfileLabel" = "语音配置";
-"customizeVoiceButton" = "自定义您的语音";
-"assistantPersonalityLabel" = "助手个性";
-"calmTrait" = "冷静";
-"kindTrait" = "友善";
-"helpfulTrait" = "乐于助人";
-"aboutAppLabel" = "关于应用";
-"versionInfo" = "镜像助手 版本 1.0.0";
-"doneButton" = "完成";
+"settingsTitle" = "Settings";
+"voiceTypeLabel" = "Voice Type";
+"voiceProfileLabel" = "Voice Profile";
+"customizeVoiceButton" = "Customize Your Voice";
+"assistantPersonalityLabel" = "Assistant Personality";
+"calmTrait" = "Calm";
+"kindTrait" = "Kind";
+"helpfulTrait" = "Helpful";
+"aboutAppLabel" = "About App";
+"versionInfo" = "MirrorChild Version 1.0.0";
+"doneButton" = "Done";
 
 /* Voice Profile screen */
-"voiceProfileTitle" = "语音配置";
-"voiceProfileInstructions" = "录制您的声音样本或您想要复制的声音。为了获得最佳效果，请至少录制15秒清晰的语音。";
-"uploadVoiceProfile" = "上传语音样本";
-"savedRecordings" = "已保存的录音";
+"voiceProfileTitle" = "Voice Recognition";
+"voiceProfileInstructions" = "Record a sample of your voice or the voice you want to replicate. For best results, record at least 15 seconds of clear speech.";
+"uploadVoiceProfile" = "Upload Voice Sample";
+"savedRecordings" = "Saved Recordings";
+"startListening" = "Start Listening";
+"stopListening" = "Stop Listening";
+"tapToStartListening" = "Tap the button below to start voice recognition";
+"waitingForSpeech" = "Waiting for speech...";
 
 /* Voice Language Settings */
-"voiceLanguageTitle" = "语音识别语言";
-"languageSelectionPrompt" = "选择语音识别语言";
-"English" = "英语";
-"Japanese" = "日语";
-"Chinese" = "中文";
-"deviceDefaultLanguage" = "设备默认";
-"languageNotAvailable" = "您的设备不支持此语言";
-"switchLanguage" = "切换语言";
-"currentLanguage" = "当前：%@";
+"voiceLanguageTitle" = "Voice Language";
+"languageSelectionPrompt" = "Select language for voice recognition";
+"English" = "English";
+"Japanese" = "Japanese";
+"Chinese" = "Chinese";
+"deviceDefaultLanguage" = "Device Default";
+"languageNotAvailable" = "This language is not available on your device";
+"switchLanguage" = "Switch Language";
+"currentLanguage" = "Current: %@";
 
 /* Screen Capture screen */
-"screenCaptureTitle" = "屏幕分享";
-"screenCaptureActive" = "屏幕分享已激活";
-"screenCaptureInactive" = "屏幕分享未激活";
-"startCapture" = "开始分享";
-"stopCapture" = "停止分享";
-"tapToStartCapture" = "点击下方按钮开始分享您的屏幕";
-"permissionRequired" = "需要权限";
-"screenPermissionRequired" = "镜像助手需要您的许可才能查看和分享您的屏幕以提供帮助。";
-"requestPermission" = "授予权限";
-"screenPermissionDenied" = "屏幕录制权限被拒绝。请在设备设置中启用此功能。";
-"permissionNeededMessage" = "分享前需要获取屏幕权限";
-"permissionDeniedMessage" = "需要屏幕录制权限。请在设置中启用。";
-"openSettings" = "打开设置";
-"openSettingsTitle" = "启用屏幕录制";
-"openSettingsMessage" = "要启用屏幕录制，请前往设置 > 隐私 > 屏幕录制，并为镜像助手启用权限。";
-"openSettingsButton" = "打开设置";
-"cleaningUpMessage" = "正在准备屏幕分享...请稍候";
-"capturingScreen" = "正在捕获屏幕内容...";
-"tapToBroadcast" = "点击下方按钮开始广播您的屏幕。即使您离开此应用，您的屏幕也会被分享。";
+"screenCaptureTitle" = "Screen Sharing";
+"screenCaptureActive" = "Screen Sharing Active";
+"screenCaptureInactive" = "Screen Sharing Inactive";
+"startCapture" = "Start Sharing";
+"stopCapture" = "Stop Sharing";
+"tapToStartCapture" = "Tap the button below to start sharing your screen";
+"permissionRequired" = "Permission Required";
+"screenPermissionRequired" = "MirrorChild needs your permission to view and share your screen to provide assistance.";
+"requestPermission" = "Grant Permission";
+"screenPermissionDenied" = "Screen recording permission was denied. Please enable it in your device settings to use this feature.";
+"permissionNeededMessage" = "Screen permission is needed before sharing";
+"permissionDeniedMessage" = "Microphone and speech recognition permissions are required. Please enable in Settings.";
+"openSettings" = "Open Settings";
+"openSettingsTitle" = "Enable Permissions";
+"openSettingsMessage" = "To enable voice recognition, please go to Settings > Privacy > Microphone and Speech Recognition, and enable permissions for MirrorChild.";
+"openSettingsButton" = "Open Settings";
+"cleaningUpMessage" = "Preparing screen sharing... Please wait";
+"capturingScreen" = "Capturing screen content...";
+"tapToBroadcast" = "Tap the button below to start broadcasting your screen. Your screen will be shared even if you leave this app.";
 
 /* Onboarding screen */
-"welcome" = "欢迎";
-"digitalCompanion" = "数字伴侣";
-"appIntroTitle" = "关于此应用";
-"feature1" = "智能手机操作支持";
-"feature2" = "轻松找到需要的功能";
-"feature3" = "日常任务帮助";
-"startButton" = "开始使用"; 
+"welcome" = "Welcome";
+"digitalCompanion" = "Digital Companion";
+"appIntroTitle" = "About this app";
+"feature1" = "Support for smartphone operations";
+"feature2" = "Easily find needed features";
+"feature3" = "Help with daily tasks";
+"startButton" = "Let's begin"; 

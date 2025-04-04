@@ -11,7 +11,7 @@
 
 /* Voice feedback messages */
 "initialGreeting" = "こんにちは! デバイスの操作をお手伝いします。";
-"listeningMessage" = "私の声が聞こえますか？ 今あなたの声を聞いています。";
+"listeningMessage" = "聞いています...";
 "voiceOffMessage" = "音声アシスタンスがオフになりました。";
 "screenOnMessage" = "画面を確認しています。";
 "screenOffMessage" = "画面共有が停止しました。";
@@ -31,10 +31,14 @@
 "doneButton" = "完了";
 
 /* Voice Profile screen */
-"voiceProfileTitle" = "音声プロファイル";
+"voiceProfileTitle" = "音声認識";
 "voiceProfileInstructions" = "あなたの声、または複製したい声のサンプルを録音してください。最良の結果を得るには、少なくとも15秒の明瞭な音声を録音してください。";
 "uploadVoiceProfile" = "音声サンプルをアップロード";
 "savedRecordings" = "保存された録音";
+"startListening" = "聞き始める";
+"stopListening" = "聞くのを止める";
+"tapToStartListening" = "下のボタンをタップして音声認識を開始";
+"waitingForSpeech" = "音声入力を待っています...";
 
 /* Voice Language Settings */
 "voiceLanguageTitle" = "音声言語";
@@ -59,10 +63,10 @@
 "requestPermission" = "許可を与える";
 "screenPermissionDenied" = "画面録画の許可が拒否されました。この機能を使用するには、デバイスの設定で有効にしてください。";
 "permissionNeededMessage" = "共有する前に画面の許可が必要です";
-"permissionDeniedMessage" = "画面録画の権限が必要です。設定で有効にしてください。";
+"permissionDeniedMessage" = "マイクと音声認識の権限が必要です。設定で有効にしてください。";
 "openSettings" = "設定を開く";
-"openSettingsTitle" = "画面録画を有効にする";
-"openSettingsMessage" = "画面録画を有効にするには、設定 > プライバシー > 画面録画 に移動し、ミラーチャイルドの権限を有効にしてください。";
+"openSettingsTitle" = "権限を有効にする";
+"openSettingsMessage" = "音声認識を有効にするには、設定 > プライバシー > マイクと音声認識に移動し、ミラーチャイルドの権限を有効にしてください。";
 "openSettingsButton" = "設定を開く";
 "cleaningUpMessage" = "画面共有の準備中... お待ちください";
 "capturingScreen" = "画面内容をキャプチャ中...";
