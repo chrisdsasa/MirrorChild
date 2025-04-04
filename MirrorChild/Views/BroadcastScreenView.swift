@@ -3,42 +3,84 @@ import ReplayKit
 
 struct BroadcastScreenView: View {
     @StateObject private var broadcastManager = BroadcastManager.shared
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         ZStack {
             // Background
-            Color(red: 0.97, green: 0.97, blue: 0.98).ignoresSafeArea()
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    DesignSystem.Colors.surface,
+                    DesignSystem.Colors.surfaceSecondary
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            ).ignoresSafeArea()
             
-            VStack(spacing: 20) {
-                // Title
-                Text("screenCaptureTitle".localized)
-                    .font(.system(size: 22, weight: .medium))
-                    .tracking(1)
-                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                    .padding(.top, 20)
+            // Subtle decorative elements
+            GeometryReader { geometry in
+                ZStack {
+                    Circle()
+                        .fill(DesignSystem.Colors.accent.opacity(0.05))
+                        .frame(width: 300, height: 300)
+                        .blur(radius: 50)
+                        .offset(x: geometry.size.width * 0.3, y: -geometry.size.height * 0.2)
+                    
+                    Circle()
+                        .fill(DesignSystem.Colors.accent.opacity(0.05))
+                        .frame(width: 250, height: 250)
+                        .blur(radius: 40)
+                        .offset(x: -geometry.size.width * 0.2, y: geometry.size.height * 0.3)
+                }
+            }
+            
+            VStack(spacing: DesignSystem.Layout.spacingLarge) {
+                // Header with title and close button
+                HStack {
+                    Text("Screen Sharing")
+                        .font(DesignSystem.Typography.title)
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                    }
+                    .buttonStyle(DesignSystem.ButtonStyles.IconButton())
+                }
+                .padding(.top, DesignSystem.Layout.spacingLarge)
+                .padding(.horizontal, DesignSystem.Layout.spacingLarge)
                 
                 // Status indicator
-                HStack {
+                HStack(spacing: DesignSystem.Layout.spacingMedium) {
                     Circle()
                         .fill(broadcastManager.isBroadcasting ? 
-                              Color.green.opacity(0.8) : Color.red.opacity(0.5))
-                        .frame(width: 12, height: 12)
+                              DesignSystem.Colors.success : DesignSystem.Colors.error)
+                        .frame(width: 10, height: 10)
                     
                     Text(broadcastManager.isBroadcasting ? 
-                         "screenCaptureActive".localized : "screenCaptureInactive".localized)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
+                         "Screen Sharing Active" : "Screen Sharing Inactive")
+                        .font(DesignSystem.Typography.body)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 16)
+                .padding(.vertical, DesignSystem.Layout.spacingSmall)
+                .padding(.horizontal, DesignSystem.Layout.spacingMedium)
                 .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white)
-                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                    RoundedRectangle(cornerRadius: DesignSystem.Layout.radiusLarge)
+                        .fill(DesignSystem.Colors.glassMaterial)
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignSystem.Layout.radiusLarge)
+                        .stroke(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal, DesignSystem.Layout.spacingLarge)
                 
                 // Preview area
-                VStack {
+                Group {
                     if broadcastManager.isBroadcasting {
                         if broadcastManager.frameInfos.isEmpty {
                             waitingForFramesView
@@ -51,23 +93,17 @@ struct BroadcastScreenView: View {
                     }
                 }
                 .frame(height: 400)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white)
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                )
-                .padding(.horizontal, 20)
+                .cardStyle()
+                .padding(.horizontal, DesignSystem.Layout.spacingLarge)
                 
                 // Broadcast picker - production-ready implementation
                 BroadcastPickerRepresentable()
                     .frame(width: 200, height: 60)
-                    .padding(.top, 20)
-                    .padding(.bottom, 10)
+                    .padding(.top, DesignSystem.Layout.spacingLarge)
                 
                 Spacer()
             }
-            .padding()
+            .padding(.vertical)
         }
         .preferredColorScheme(.light)
     }
@@ -75,14 +111,14 @@ struct BroadcastScreenView: View {
     // MARK: - Subviews
     
     private var waitingForFramesView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignSystem.Layout.spacingLarge) {
             ProgressView()
-                .scaleEffect(1.5)
-                .padding(.bottom, 10)
+                .scaleEffect(1.2)
+                .tint(DesignSystem.Colors.accent)
             
-            Text("capturingScreen".localized)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+            Text("Capturing screen content...")
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
         }
@@ -90,30 +126,32 @@ struct BroadcastScreenView: View {
     
     private var frameInfosView: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
+            LazyVStack(alignment: .leading, spacing: DesignSystem.Layout.spacingSmall) {
                 ForEach(broadcastManager.frameInfos, id: \.self) { frameInfo in
                     Text(frameInfo)
-                        .font(.system(size: 14, weight: .regular))
-                        .padding(10)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .padding(DesignSystem.Layout.spacingSmall)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(red: 0.95, green: 0.95, blue: 0.98))
+                            RoundedRectangle(cornerRadius: DesignSystem.Layout.radiusSmall)
+                                .fill(DesignSystem.Colors.surfaceSecondary)
                         )
-                        .padding(.horizontal)
+                        .padding(.horizontal, DesignSystem.Layout.spacingSmall)
                 }
             }
+            .padding(DesignSystem.Layout.spacingSmall)
         }
     }
     
     private var emptyPreviewState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignSystem.Layout.spacingLarge) {
             Image(systemName: "display")
                 .font(.system(size: 60))
-                .foregroundColor(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.5))
+                .foregroundColor(DesignSystem.Colors.textTertiary)
             
-            Text("tapToBroadcast".localized)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+            Text("Tap the button below to start sharing your screen")
+                .font(DesignSystem.Typography.subtitle)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
         }
@@ -124,18 +162,24 @@ struct BroadcastScreenView: View {
 
 struct BroadcastPickerRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
-        // 获取最简单的广播选择器视图
         let pickerView = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 200, height: 60))
-        pickerView.preferredExtension = nil  // 不指定，让系统自动选择
+        pickerView.preferredExtension = nil
         pickerView.showsMicrophoneButton = false
         
-        // 自定义按钮外观
+        // Custom appearance
         for subview in pickerView.subviews {
             if let button = subview as? UIButton {
-                button.backgroundColor = UIColor(red: 0.3, green: 0.3, blue: 0.8, alpha: 1.0)
+                // Use our accent color from design system
+                button.backgroundColor = UIColor(
+                    red: 0.45,
+                    green: 0.45, 
+                    blue: 0.85,
+                    alpha: 1.0
+                )
                 button.tintColor = .white
-                button.setTitle("开始广播", for: .normal)
+                button.setTitle("Start Broadcast", for: .normal)
                 button.layer.cornerRadius = 30
+                button.layer.masksToBounds = true
                 button.frame = CGRect(x: 0, y: 0, width: 200, height: 60)
             }
         }
@@ -146,6 +190,14 @@ struct BroadcastPickerRepresentable: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {
-        // 不需要更新
+        // Nothing to update
+    }
+}
+
+// MARK: - Preview
+
+struct BroadcastScreenView_Previews: PreviewProvider {
+    static var previews: some View {
+        BroadcastScreenView()
     }
 } 

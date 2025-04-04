@@ -40,6 +40,21 @@
 "tapToStartListening" = "下のボタンをタップして音声認識を開始";
 "waitingForSpeech" = "音声入力を待っています...";
 
+/* Voice Recording */
+"startRecording" = "録音開始";
+"stopRecording" = "録音停止";
+"recordAgain" = "再録音";
+"playRecording" = "再生";
+"pausePlayback" = "一時停止";
+"recordingComplete" = "録音完了";
+"uploadSuccess" = "アップロード成功！";
+"confirm" = "OK";
+"permissionRequired" = "権限が必要です";
+"microphonePermissionMessage" = "音声を録音するにはマイクの使用許可が必要です。設定で有効にしてください。";
+"autoAddPunctuation" = "句読点を自動追加";
+"recordingTime" = "%.1f秒";
+"targetRecordingTime" = "30秒";
+
 /* Voice Language Settings */
 "voiceLanguageTitle" = "音声言語";
 "languageSelectionPrompt" = "音声認識に使用する言語を選択してください";
@@ -71,6 +86,11 @@
 "cleaningUpMessage" = "画面共有の準備中... お待ちください";
 "capturingScreen" = "画面内容をキャプチャ中...";
 "tapToBroadcast" = "下のボタンをタップして画面配信を開始します。このアプリを離れても画面は共有されます。";
+
+/* Speaker Settings */
+"音声出力" = "音声出力";
+"スピーカー" = "スピーカー";
+"イヤホン" = "イヤホン";
 
 /* Onboarding screen */
 "welcome" = "ようこそ";
