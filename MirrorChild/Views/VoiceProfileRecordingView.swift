@@ -378,7 +378,7 @@ struct VoiceProfileRecordingView: View {
     private func setupAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default)
+            try session.setCategory(.playAndRecord, mode: .default, options: .defaultToSpeaker)
             try session.setActive(true)
         } catch {
             print("设置音频会话失败: \(error)")

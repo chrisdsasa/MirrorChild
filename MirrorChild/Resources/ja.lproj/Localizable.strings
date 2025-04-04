@@ -87,6 +87,11 @@
 "capturingScreen" = "画面内容をキャプチャ中...";
 "tapToBroadcast" = "下のボタンをタップして画面配信を開始します。このアプリを離れても画面は共有されます。";
 
+/* Speaker Settings */
+"音声出力" = "音声出力";
+"スピーカー" = "スピーカー";
+"イヤホン" = "イヤホン";
+
 /* Onboarding screen */
 "welcome" = "ようこそ";
 "digitalCompanion" = "デジタルコンパニオン";

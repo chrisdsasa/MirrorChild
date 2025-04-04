@@ -88,6 +88,18 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         }
     }
     
+    // 扬声器模式
+    @Published var useLoudspeaker: Bool = true {
+        didSet {
+            // 保存用户选择
+            UserDefaults.standard.set(useLoudspeaker, forKey: "useLoudspeaker")
+            
+            if !isRunningInPreview {
+                updateSpeakerMode()
+            }
+        }
+    }
+    
     // 获取所有可用的语音识别语言
     @Published var availableLanguages: [VoiceLanguage] = []
     
@@ -118,6 +130,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             // 获取标点符号设置
             self.enablePunctuation = UserDefaults.standard.bool(forKey: "enablePunctuation")
             
+            // 获取扬声器设置
+            self.useLoudspeaker = UserDefaults.standard.object(forKey: "useLoudspeaker") as? Bool ?? true
+            
             return
         }
         
@@ -130,12 +145,20 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         // 获取标点符号设置
         self.enablePunctuation = UserDefaults.standard.bool(forKey: "enablePunctuation")
         
+        // 获取扬声器设置
+        self.useLoudspeaker = UserDefaults.standard.object(forKey: "useLoudspeaker") as? Bool ?? true
+        
         // 初始化音频引擎
         audioEngine = AVAudioEngine()
         
         // 初始化语音识别器和检查可用语言
         updateSpeechRecognizer()
         checkAvailableLanguages()
+        
+        // 应用扬声器设置
+        if !isRunningInPreview {
+            updateSpeakerMode()
+        }
         
         // 设置应用状态监听
         setupNotifications()
@@ -425,7 +448,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             // 配置音频会话
             do {
                 let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setCategory(.record, mode: .measurement)
+                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
                 print("音频会话配置成功")
             } catch {
@@ -560,5 +583,32 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             audioEngine?.stop()
             audioEngine?.inputNode.removeTap(onBus: 0)
         }
+    }
+    
+    // 更新扬声器模式
+    func updateSpeakerMode() {
+        guard !isRunningInPreview else { return }
+        
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            
+            if useLoudspeaker {
+                // 使用扬声器
+                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            } else {
+                // 使用听筒
+                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
+            }
+            
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            print("扬声器模式已更新: \(useLoudspeaker ? "扬声器" : "听筒")")
+        } catch {
+            print("更新扬声器模式失败: \(error)")
+        }
+    }
+    
+    // 切换扬声器模式
+    func toggleSpeakerMode() {
+        useLoudspeaker.toggle()
     }
 } 

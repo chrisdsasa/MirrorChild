@@ -401,6 +401,36 @@ struct JapaneseStyleSettingsView: View {
                         .padding(.vertical, 5)
                         .padding(.horizontal, 15)
                         
+                        // 扬声器设置
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("音声出力".localized)
+                                .font(.system(size: 18, weight: .medium))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                .padding(.leading, 10)
+                            
+                            HStack {
+                                Text(voiceCaptureManager.useLoudspeaker ? "スピーカー" : "イヤホン")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
+                                
+                                Spacer()
+                                
+                                Toggle("", isOn: $voiceCaptureManager.useLoudspeaker)
+                                    .labelsHidden()
+                                    .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.5, green: 0.5, blue: 0.8)))
+                            }
+                            .padding(15)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.white)
+                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                            )
+                            .padding(.horizontal, 10)
+                        }
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 15)
+                        
                         // Voice profile section
                         VStack(alignment: .leading, spacing: 15) {
                             Text("voiceProfileLabel".localized)

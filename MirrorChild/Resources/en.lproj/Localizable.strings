@@ -87,6 +87,11 @@
 "capturingScreen" = "Capturing screen content...";
 "tapToBroadcast" = "Tap the button below to start broadcasting your screen. Your screen will be shared even if you leave this app.";
 
+/* Speaker Settings */
+"音声出力" = "Audio Output";
+"スピーカー" = "Speaker";
+"イヤホン" = "Earpiece";
+
 /* Onboarding screen */
 "welcome" = "Welcome";
 "digitalCompanion" = "Digital Companion";
