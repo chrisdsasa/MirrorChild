@@ -25,6 +25,22 @@ struct VoiceCaptureView: View {
                     .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                     .padding(.top, 20)
                 
+                // 标点符号开关
+                Toggle(isOn: $voiceCaptureManager.enablePunctuation) {
+                    Text("自动添加标点符号")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
+                }
+                .padding(.horizontal, 25)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white)
+                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                )
+                .padding(.horizontal, 20)
+                .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.5, green: 0.5, blue: 0.8)))
+                
                 // Status indicator
                 HStack {
                     Circle()
