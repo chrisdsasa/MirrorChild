@@ -88,7 +88,7 @@ struct BroadcastScreenView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .cornerRadius(10)
-                            .padding()
+                                .padding()
                     } else {
                         emptyPreviewState
                     }
@@ -470,48 +470,37 @@ struct BroadcastScreenView: View {
             
             // 创建播放器
             do {
-                // 旧版iOS使用这种初始化方式
-                if #available(iOS 15.0, *) {
-                    let player = try AVAudioPlayer(audioFormat: buffer!.format, buffer: buffer!)
-                    player.numberOfLoops = -1 // 无限循环
-                    player.volume = 0.01
-                    player.prepareToPlay()
-                    player.play()
-                    self.audioPlayer = player
-                } else {
-                    // iOS 15之前需要将PCM数据转换为Data
-                    let audioFormat = buffer!.format
-                    let audioBuffer = buffer!
+                // 将PCM数据转换为Data以便AVAudioPlayer可以使用
+                let audioFormat = buffer!.format
+                let audioBuffer = buffer!
                 
-                    
-                    // 创建Data包装PCM数据
-                    let channelCount = Int(audioFormat.channelCount)
-                    let frameLength = Int(audioBuffer.frameLength)
-                    let bytesPerFrame = audioFormat.streamDescription.pointee.mBytesPerFrame
-                    let dataSize = frameLength * Int(bytesPerFrame)
-                    var audioData = Data(count: dataSize)
-                    
-                    // 将PCM数据复制到Data中
-                    audioData.withUnsafeMutableBytes { ptr in
-                        for channel in 0..<channelCount {
-                            let channelData = audioBuffer.floatChannelData![channel]
-                            for frame in 0..<frameLength {
-                                // 简单地将浮点样本转换为16位PCM
-                                let offset = frame * channelCount + channel
-                                let sample = Int16(channelData[frame] * 32767.0)
-                                ptr.storeBytes(of: sample, toByteOffset: offset * 2, as: Int16.self)
-                            }
+                // 创建Data包装PCM数据
+                let channelCount = Int(audioFormat.channelCount)
+                let frameLength = Int(audioBuffer.frameLength)
+                let bytesPerFrame = audioFormat.streamDescription.pointee.mBytesPerFrame
+                let dataSize = frameLength * Int(bytesPerFrame)
+                var audioData = Data(count: dataSize)
+                
+                // 将PCM数据复制到Data中
+                audioData.withUnsafeMutableBytes { ptr in
+                    for channel in 0..<channelCount {
+                        let channelData = audioBuffer.floatChannelData![channel]
+                        for frame in 0..<frameLength {
+                            // 简单地将浮点样本转换为16位PCM
+                            let offset = frame * channelCount + channel
+                            let sample = Int16(channelData[frame] * 32767.0)
+                            ptr.storeBytes(of: sample, toByteOffset: offset * 2, as: Int16.self)
                         }
                     }
-                    
-                    // 使用Data创建AVAudioPlayer
-                    let player = try AVAudioPlayer(data: audioData)
-                    player.numberOfLoops = -1
-                    player.volume = 0.01
-                    player.prepareToPlay()
-                    player.play()
-                    self.audioPlayer = player
                 }
+                
+                // 使用Data创建AVAudioPlayer
+                let player = try AVAudioPlayer(data: audioData, fileTypeHint: AVFileType.wav.rawValue)
+                player.numberOfLoops = -1
+                player.volume = 0.01
+                player.prepareToPlay()
+                player.play()
+                self.audioPlayer = player
                 
                 print("开始播放内存生成的静音音频")
             } catch {

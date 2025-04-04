@@ -218,7 +218,7 @@ struct VoiceCloneView: View {
             if voiceCaptureManager.isRecording {
                 // 仅显示停止按钮
                 Button(action: {
-                    _ = voiceCaptureManager.stopVoiceFileRecording()
+                    voiceCaptureManager.stopRecording()
                 }) {
                     ZStack {
                         Circle()
@@ -282,7 +282,12 @@ struct VoiceCloneView: View {
             } else {
                 // 显示录音按钮
                 Button(action: {
-                    voiceCaptureManager.startVoiceFileRecording()
+                    // 使用标准的录音方法
+                    voiceCaptureManager.startRecording { success, error in
+                        if !success, let error = error {
+                            print("启动录音失败: \(error.localizedDescription)")
+                        }
+                    }
                 }) {
                     ZStack {
                         Circle()
@@ -370,7 +375,7 @@ struct VoiceCloneView: View {
         voiceCaptureManager.checkPermissionStatus()
         
         if voiceCaptureManager.permissionStatus == .notDetermined {
-            voiceCaptureManager.requestPermissions { granted in
+            voiceCaptureManager.requestPermissions { granted, error in
                 if !granted {
                     showPermissionAlert()
                 }

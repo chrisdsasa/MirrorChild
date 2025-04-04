@@ -305,7 +305,7 @@ struct VoiceProfileRecordingView: View {
         voiceCaptureManager.checkPermissionStatus()
         
         if voiceCaptureManager.permissionStatus == .notDetermined {
-            voiceCaptureManager.requestPermissions { granted in
+            voiceCaptureManager.requestPermissions { granted, error in
                 if !granted {
                     alertMessage = "需要麦克风权限才能使用语音功能。请在设置中允许访问麦克风。"
                     showAlert = true
@@ -322,7 +322,15 @@ struct VoiceProfileRecordingView: View {
         remainingSeconds = 15
         
         // 开始录制
-        voiceCaptureManager.startVoiceFileRecording()
+        voiceCaptureManager.startRecording { success, error in
+            if !success, let error = error {
+                print("录音启动失败: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.alertMessage = "录音启动失败: \(error.localizedDescription)"
+                    self.showAlert = true
+                }
+            }
+        }
         
         // 显示录音状态
         print("正在录制语音，等待15秒...")
@@ -352,8 +360,11 @@ struct VoiceProfileRecordingView: View {
         countdownTimer?.invalidate()
         countdownTimer = nil
         
-        // 停止录音并获取文件URL
-        if let fileURL = voiceCaptureManager.stopVoiceFileRecording() {
+        // 停止录音
+        voiceCaptureManager.stopRecording()
+        
+        // 获取当前录音文件URL
+        if let fileURL = voiceCaptureManager.voiceFileURL {
             print("录音完成，保存在: \(fileURL.path)")
             
             // 显示保存对话框

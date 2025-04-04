@@ -601,9 +601,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     }
     
     // 请求权限
-    func requestPermissions(completion: @escaping (Bool) -> Void) {
+    func requestPermissions(completion: @escaping (Bool, Error?) -> Void) {
         if isRunningInPreview {
-            completion(true)
+            completion(true, nil)
             return
         }
         
@@ -612,7 +612,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 DispatchQueue.main.async {
                     self.permissionStatus = granted ? .authorized : .denied
                     print("麦克风权限请求结果: \(granted ? "已授权" : "已拒绝")")
-                    completion(granted)
+                    completion(granted, nil)
                 }
             }
         } else {
@@ -620,12 +620,15 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 DispatchQueue.main.async {
                     self.permissionStatus = granted ? .authorized : .denied
                     print("麦克风权限请求结果: \(granted ? "已授权" : "已拒绝")")
-                    completion(granted)
+                    completion(granted, nil)
                 }
             }
         }
     }
     
+    // MARK: - 语音转文字实现
+
+    // 开始录音
     func startRecording(completion: @escaping (Bool, Error?) -> Void) {
         print("开始录音请求...")
         
@@ -671,13 +674,25 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             }
         }
         
+        // 如果使用OpenAI Whisper API，需要保存录音文件而不是使用SFSpeechRecognizer
+        if UserDefaults.standard.bool(forKey: "useWhisperAPI") {
+            startRecordingForWhisper(completion: completion)
+            return
+        }
+        
+        // 使用Apple的SFSpeechRecognizer进行语音识别的原始实现
+        startRecordingWithSFSpeechRecognizer(completion: completion)
+    }
+    
+    // 使用Apple的SFSpeechRecognizer进行语音转文字
+    private func startRecordingWithSFSpeechRecognizer(completion: @escaping (Bool, Error?) -> Void) {
         // 检查语音识别器是否可用
         guard let speechRecognizer = speechRecognizer else {
             audioSessionLock.unlock()
             print("错误：语音识别器未初始化")
             let error = NSError(domain: "com.mirrochild.speechrecognition", 
-                               code: 1,
-                               userInfo: [NSLocalizedDescriptionKey: "语音识别器未初始化。"])
+                              code: 1,
+                              userInfo: [NSLocalizedDescriptionKey: "语音识别器未初始化。"])
             completion(false, error)
             return
         }
@@ -686,17 +701,22 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             audioSessionLock.unlock()
             print("错误：设备不支持语音识别")
             let error = NSError(domain: "com.mirrochild.speechrecognition", 
-                               code: 1,
-                               userInfo: [NSLocalizedDescriptionKey: "此设备不支持语音识别功能。"])
+                              code: 2,
+                              userInfo: [NSLocalizedDescriptionKey: "此设备不支持语音识别功能。"])
             completion(false, error)
             return
         }
         
-        print("准备请求录音权限...")
-        // 先请求权限
-        requestPermissions { [weak self] granted in
-            guard let self = self else { 
+        // 请求麦克风和语音识别权限
+        requestPermissions { [weak self] granted, error in
+            guard let self = self else {
                 completion(false, NSError(domain: "com.mirrochild.speechrecognition", code: 999, userInfo: [NSLocalizedDescriptionKey: "内部错误: self被释放"]))
+                return 
+            }
+            
+            if let error = error {
+                self.audioSessionLock.unlock()
+                completion(false, error)
                 return 
             }
             
@@ -883,6 +903,114 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         }
     }
     
+    // 使用OpenAI Whisper API进行语音转文字 - 开始录音并保存到文件
+    private func startRecordingForWhisper(completion: @escaping (Bool, Error?) -> Void) {
+        // 请求麦克风权限
+        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+            guard let self = self else { return }
+            
+            if !granted {
+                self.audioSessionLock.unlock()
+                let error = NSError(domain: "com.mirrochild.whisperapi", 
+                                   code: 1, 
+                                   userInfo: [NSLocalizedDescriptionKey: "麦克风权限被拒绝"])
+                completion(false, error)
+                return
+            }
+            
+            // 配置音频会话
+            do {
+                let audioSession = AVAudioSession.sharedInstance()
+                try audioSession.setCategory(.playAndRecord, mode: .default)
+                try audioSession.setActive(true)
+                self.isAudioSessionActive = true
+                
+                // 创建临时录音文件路径
+                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let fileName = "whisper_recording_\(Date().timeIntervalSince1970).m4a"
+                let fileURL = documentsDirectory.appendingPathComponent(fileName)
+                
+                // 配置录音设置 - 高质量音频格式
+                let settings: [String: Any] = [
+                    AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                    AVSampleRateKey: 44100.0,
+                    AVNumberOfChannelsKey: 1,
+                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+                ]
+                
+                // 创建并配置录音机
+                self.audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
+                self.audioRecorder?.delegate = self
+                self.audioRecorder?.prepareToRecord()
+                
+                // 开始录音
+                if self.audioRecorder?.record() == true {
+                    self.isRecording = true
+                    self.recordingStartTime = Date()
+                    self.voiceFileURL = fileURL
+                    
+                    // 启动定时器，定期更新录音时长
+                    self.recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                        guard let self = self, let startTime = self.recordingStartTime else { return }
+                        self.currentRecordingDuration = Date().timeIntervalSince(startTime)
+                        
+                        // 定期发送录音到Whisper API进行处理 (每5秒)
+                        if Int(self.currentRecordingDuration) % 5 == 0 && Int(self.currentRecordingDuration) > 0 {
+                            self.processRecordingWithWhisper()
+                        }
+                    }
+                    
+                    // 开始后台任务
+                    self.beginBackgroundTask()
+                    
+                    self.audioSessionLock.unlock()
+                    completion(true, nil)
+                } else {
+                    self.audioSessionLock.unlock()
+                    let error = NSError(domain: "com.mirrochild.whisperapi", 
+                                       code: 2, 
+                                       userInfo: [NSLocalizedDescriptionKey: "无法开始录音"])
+                    completion(false, error)
+                }
+            } catch {
+                self.audioSessionLock.unlock()
+                completion(false, error)
+            }
+        }
+    }
+    
+    // 定期使用Whisper API处理当前录音
+    private func processRecordingWithWhisper() {
+        guard isRecording, 
+              let recorder = audioRecorder, 
+              recorder.isRecording, 
+              let fileURL = voiceFileURL else {
+            return
+        }
+        
+        // 暂停录音
+        recorder.pause()
+        
+        // 使用OpenAI服务转录当前内容
+        OpenAIService.shared.transcribeAudio(from: fileURL) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let transcribedText):
+                DispatchQueue.main.async {
+                    self.transcribedText = transcribedText
+                }
+            case .failure(let error):
+                print("Whisper API转录错误: \(error.localizedDescription)")
+            }
+            
+            // 继续录音
+            if self.isRecording {
+                recorder.record()
+            }
+        }
+    }
+    
     // 停止录音
     func stopRecording() {
         print("停止录音...")
@@ -897,245 +1025,122 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         audioSessionLock.lock()
         defer { audioSessionLock.unlock() }
         
-        // 重置录音状态
-        self.isRecording = false
+        // 如果正在使用Whisper API，处理AVAudioRecorder
+        if UserDefaults.standard.bool(forKey: "useWhisperAPI") {
+            stopRecordingForWhisper()
+            return
+        }
         
-        // 停止录音相关任务和引擎
-        recognitionTask?.cancel()
-        recognitionTask = nil
-        recognitionRequest = nil
+        // 原始的停止录音功能 (使用SFSpeechRecognizer)
+        stopRecordingWithSFSpeechRecognizer()
+    }
+    
+    // 停止使用Apple的SFSpeechRecognizer的录音
+    private func stopRecordingWithSFSpeechRecognizer() {
+        // 如果正在进行语音识别，先停止它
+        if let recognitionTask = recognitionTask {
+            recognitionTask.cancel()
+            self.recognitionTask = nil
+        }
         
-        // 停止音频引擎和移除输入节点上的tap
+        // 移除音频输入节点上的tap
         if let audioEngine = audioEngine, audioEngine.isRunning {
             audioEngine.inputNode.removeTap(onBus: 0)
             audioEngine.stop()
-            print("音频引擎已停止")
         }
         
-        // 停止背景任务
+        // 停止后台任务
+        endBackgroundTask()
+        
+        // 释放录音请求
+        recognitionRequest = nil
+        
+        // 更新状态
+        isRecording = false
+        
+        // 重置音频会话
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            isAudioSessionActive = false
+        } catch {
+            print("停止录音时释放音频会话失败: \(error.localizedDescription)")
+        }
+        
+        print("录音已停止")
+    }
+    
+    // 停止使用Whisper API的录音
+    private func stopRecordingForWhisper() {
+        // 停止录音定时器
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        
+        // 停止录音机
+        audioRecorder?.stop()
+        
+        // 最终处理录音文件
+        if let fileURL = voiceFileURL {
+            // 使用OpenAI的Whisper API处理整个录音文件
+            OpenAIService.shared.transcribeAudio(from: fileURL) { [weak self] result in
+                guard let self = self else { return }
+                
+                switch result {
+                case .success(let transcribedText):
+                    DispatchQueue.main.async {
+                        // 更新转录文本
+                        self.transcribedText = transcribedText
+                        
+                        // 将录音保存为已完成的录音
+                        if let fileURL = self.voiceFileURL {
+                            self.saveCompletedRecording(fileURL: fileURL, text: transcribedText)
+                        }
+                    }
+                case .failure(let error):
+                    print("最终Whisper API转录错误: \(error.localizedDescription)")
+                }
+            }
+        }
+        
+        // 结束后台任务
         endBackgroundTask()
         
         // 重置音频会话
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             isAudioSessionActive = false
-            print("音频会话已停用")
         } catch {
-            print("停用音频会话时出错: \(error.localizedDescription)")
+            print("停止Whisper录音时释放音频会话失败: \(error.localizedDescription)")
         }
         
-        // 清除转录文本
-        DispatchQueue.main.async {
-            self.transcribedText = ""
-        }
-        
-        // 清除错误
-        self.error = nil
-    }
-    
-    // 重置录音状态
-    private func resetRecording() {
-        // 停止之前的任务，如果有的话
-        if let recognitionTask = recognitionTask {
-            recognitionTask.cancel()
-            self.recognitionTask = nil
-        }
-        
-        // 移除任何现有的音频捕获
-        if audioEngine?.isRunning == true {
-            audioEngine?.stop()
-            audioEngine?.inputNode.removeTap(onBus: 0)
-        }
-    }
-    
-    // MARK: - 语音录制增强功能
-    
-    // 开始录制声音文件
-    func startVoiceFileRecording() {
-        // 如果在预览模式下，仅模拟
-        if isRunningInPreview {
-            isRecording = true
-            recordingStartTime = Date()
-            startTimerForRecording()
-            return
-        }
-        
-        // 如果正在进行语音识别，先停止它
-        if isRecording {
-            stopRecording()
-            // 短暂延迟让音频会话完全释放
-            Thread.sleep(forTimeInterval: 0.2)
-        }
-        
-        // 停止之前的任何录音
-        if audioRecorder?.isRecording == true {
-            audioRecorder?.stop()
-        }
-        
-        // 请求必要的权限
-        requestPermissions { [weak self] granted in
-            guard let self = self, granted else {
-                print("语音录制权限被拒绝")
-                return
-            }
-            
-            do {
-                // 确保文件目录存在
-                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                
-                // 打印当前路径，确认权限
-                print("文档目录路径: \(documentsDirectory.path)")
-                
-                // 创建唯一的文件名
-                let fileName = "voice_recording_\(Date().timeIntervalSince1970).m4a"
-                let fileURL = documentsDirectory.appendingPathComponent(fileName)
-                
-                // 尝试创建一个测试文件，确认有写入权限
-                let testString = "Test"
-                let testURL = documentsDirectory.appendingPathComponent("test.txt")
-                try testString.write(to: testURL, atomically: true, encoding: .utf8)
-                try FileManager.default.removeItem(at: testURL)
-                print("写入权限测试成功")
-                
-                // 配置音频会话
-                let audioSession = AVAudioSession.sharedInstance()
-                
-                // 重置音频会话
-                try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
-                
-                // 设置录音类别并激活
-                try audioSession.setCategory(.record, mode: .default)
-                try audioSession.setActive(true)
-                
-                print("音频会话设置完成")
-                
-                // 设置录音参数 - 使用更通用的设置
-                let settings: [String: Any] = [
-                    AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                    AVSampleRateKey: 44100.0,
-                    AVNumberOfChannelsKey: 1,
-                    AVEncoderAudioQualityKey: AVAudioQuality.max.rawValue
-                ]
-                
-                // 保存文件URL
-                self.voiceFileURL = fileURL
-                print("将录音保存到: \(fileURL.path)")
-                
-                // 创建并配置录音器
-                self.audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
-                guard let recorder = self.audioRecorder else {
-                    throw NSError(domain: "com.mirrochild.recording", code: 1, userInfo: [NSLocalizedDescriptionKey: "无法创建录音机"])
-                }
-                
-                recorder.delegate = self
-                recorder.isMeteringEnabled = true
-                
-                // 确保录音器准备好
-                if !recorder.prepareToRecord() {
-                    throw NSError(domain: "com.mirrochild.recording", code: 2, userInfo: [NSLocalizedDescriptionKey: "录音准备失败"])
-                }
-                
-                print("录音器已准备完毕")
-                
-                // 开始录制，并设置最长录音时间（例如60秒）
-                if !recorder.record(forDuration: 60) {
-                    throw NSError(domain: "com.mirrochild.recording", code: 3, userInfo: [NSLocalizedDescriptionKey: "开始录音失败"])
-                }
-                
-                // 更新状态
-                self.isRecording = true
-                self.recordingStartTime = Date()
-                self.startTimerForRecording()
-                
-                print("录音已成功启动: \(self.isRecording ? "正在录音" : "录音失败")")
-                print("录音器状态: \(recorder.isRecording ? "正在录音" : "未录音")")
-                
-            } catch {
-                print("录音设置失败: \(error.localizedDescription)")
-                self.error = error
-            }
-        }
-    }
-    
-    // 启动计时器跟踪录制时长
-    private func startTimerForRecording() {
-        recordingTimer?.invalidate()
-        currentRecordingDuration = 0
-        
-        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, let startTime = self.recordingStartTime else { return }
-            self.currentRecordingDuration = Date().timeIntervalSince(startTime)
-        }
-    }
-    
-    // 停止录音并返回录音文件URL
-    func stopVoiceFileRecording() -> URL? {
-        guard isRecording else {
-            print("stopVoiceFileRecording: 没有正在进行的录音")
-            return nil
-        }
-        
-        print("停止文件录音")
-        audioRecorder?.stop()
-        audioRecorder = nil
-        
-        guard let fileURL = voiceFileURL else {
-            print("停止录音失败：没有有效的文件URL")
-            return nil
-        }
-        
-        // 验证文件是否存在以及大小是否合理
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: fileURL.path),
-              let fileAttributes = try? fileManager.attributesOfItem(atPath: fileURL.path),
-              let fileSize = fileAttributes[.size] as? Int,
-              fileSize > 1000 else { // 确保文件至少有1KB
-            print("录音文件无效或太小: \(fileURL.path)")
-            isRecording = false
-            try? fileManager.removeItem(at: fileURL)
-            return nil
-        }
-        
-        // 停止录音后，重置录音状态但保留文件URL
+        // 更新状态
         isRecording = false
+        recordingStartTime = nil
         
-        // 重置音频会话，为播放做准备
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            print("重置音频会话失败: \(error.localizedDescription)")
+        print("Whisper录音已停止")
+    }
+    
+    // 保存完成的录音
+    private func saveCompletedRecording(fileURL: URL, text: String) {
+        let duration = currentRecordingDuration
+        let recording = SavedRecording(
+            fileName: fileURL.lastPathComponent,
+            fileURL: fileURL,
+            duration: duration,
+            description: text.prefix(100) + (text.count > 100 ? "..." : "")
+        )
+        
+        savedRecordings.append(recording)
+        saveSavedRecordings()
+    }
+    
+    // 获取使用何种语音识别方式
+    var isUsingWhisperAPI: Bool {
+        get {
+            return UserDefaults.standard.bool(forKey: "useWhisperAPI")
         }
-        
-        // 验证录音文件可以播放
-        do {
-            // 配置音频会话为播放模式
-            try AVAudioSession.sharedInstance().setCategory(.playback)
-            try AVAudioSession.sharedInstance().setActive(true)
-            
-            // 尝试加载音频文件
-            let audioPlayer = try AVAudioPlayer(contentsOf: fileURL)
-            
-            // 验证音频长度大于0.5秒
-            let duration = audioPlayer.duration
-            if duration < 0.5 {
-                print("录音时长太短: \(duration)秒")
-                resetVoiceCloneStatus()
-                return nil
-            }
-            
-            print("成功创建录音文件，时长: \(duration)秒")
-            
-            // 更新录音时长
-            currentRecordingDuration = duration
-            
-        } catch {
-            print("验证录音文件失败: \(error.localizedDescription)")
-            resetVoiceCloneStatus()
-            return nil
+        set {
+            UserDefaults.standard.set(newValue, forKey: "useWhisperAPI")
         }
-        
-        // 返回录音文件的URL
-        return fileURL
     }
     
     // MARK: - 声音克隆API功能
@@ -1571,6 +1576,29 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         } catch {
             print("重置音频会话失败: \(error.localizedDescription)")
         }
+    }
+    
+    // 重置录音状态
+    private func resetRecording() {
+        // 停止之前的任务，如果有的话
+        if let recognitionTask = recognitionTask {
+            recognitionTask.cancel()
+            self.recognitionTask = nil
+        }
+        
+        // 移除任何现有的音频捕获
+        if audioEngine?.isRunning == true {
+            audioEngine?.stop()
+            audioEngine?.inputNode.removeTap(onBus: 0)
+        }
+        
+        // 重置录音请求
+        recognitionRequest = nil
+    }
+    
+    // 保存已保存的录音列表
+    private func saveSavedRecordings() {
+        saveSavedRecordingsToStorage()
     }
 }
 

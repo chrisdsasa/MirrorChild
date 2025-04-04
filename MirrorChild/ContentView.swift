@@ -786,7 +786,7 @@ struct VoiceProfileView: View {
                 
                 // 停止录音并重置音频会话
                 if voiceCaptureManager.isRecording {
-                    _ = voiceCaptureManager.stopVoiceFileRecording()
+                    voiceCaptureManager.stopRecording()
                     
                     // 确保在主线程上发送通知
                     DispatchQueue.main.async {
@@ -952,7 +952,7 @@ struct VoiceProfileView: View {
         Button(action: {
             if voiceCaptureManager.isRecording {
                 // 停止录音
-                _ = voiceCaptureManager.stopVoiceFileRecording()
+                voiceCaptureManager.stopRecording()
                 // 确保无论录音是否成功停止，都更新UI状态
                 DispatchQueue.main.async {
                     // 通知其他视图录音已停止
@@ -964,10 +964,15 @@ struct VoiceProfileView: View {
                 voiceCaptureManager.resetVoiceCloneStatus()
             } else {
                 // 开始录音
-                voiceCaptureManager.startVoiceFileRecording()
-                // 通知其他视图录音已开始
-                VoiceProfileCoordinator.shared.notifyRecordingStarted()
-                print("发送开始录音通知")
+                voiceCaptureManager.startRecording { success, error in
+                    if !success, let error = error {
+                        print("录音启动失败: \(error.localizedDescription)")
+                    } else {
+                        // 通知其他视图录音已开始
+                        VoiceProfileCoordinator.shared.notifyRecordingStarted()
+                        print("发送开始录音通知")
+                    }
+                }
             }
         }) {
             HStack {

@@ -78,6 +78,33 @@ struct VoiceCaptureView: View {
                         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                 )
                 
+                // API切换开关
+                Toggle(isOn: $voiceCaptureManager.isUsingWhisperAPI) {
+                    HStack {
+                        Image(systemName: "network")
+                            .foregroundColor(voiceCaptureManager.isUsingWhisperAPI ? .blue : .gray)
+                        
+                        Text(voiceCaptureManager.isUsingWhisperAPI ? "使用OpenAI Whisper" : "使用Apple语音识别")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(voiceCaptureManager.isUsingWhisperAPI ? .blue : .gray)
+                    }
+                }
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 15)
+                        .fill(Color.white.opacity(0.8))
+                        .shadow(color: Color.black.opacity(0.03), radius: 1, x: 0, y: 1)
+                )
+                .padding(.horizontal, 20)
+                .disabled(voiceCaptureManager.isRecording) // 录音过程中不允许切换
+                
+                // API Key输入 (仅在使用Whisper API时显示)
+                if voiceCaptureManager.isUsingWhisperAPI {
+                    apiKeyInputView
+                }
+                
                 // Transcription area
                 VStack {
                     if voiceCaptureManager.isRecording || !voiceCaptureManager.transcribedText.isEmpty {
@@ -87,7 +114,7 @@ struct VoiceCaptureView: View {
                         emptyStateView
                     }
                 }
-                .frame(height: 400)
+                .frame(height: voiceCaptureManager.isUsingWhisperAPI ? 350 : 400)
                 .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
@@ -189,6 +216,34 @@ struct VoiceCaptureView: View {
         .preferredColorScheme(.light)
     }
     
+    // API Key输入视图
+    private var apiKeyInputView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("OpenAI API Key")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.gray)
+            
+            SecureField("输入API Key...", text: Binding(
+                get: { UserDefaults.standard.string(forKey: "openai_api_key") ?? "" },
+                set: { OpenAIService.shared.setApiKey($0) }
+            ))
+            .font(.system(size: 15))
+            .padding(10)
+            .background(Color.white)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+            )
+            
+            Text("需要OpenAI API Key才能使用Whisper转录服务")
+                .font(.system(size: 12))
+                .foregroundColor(.gray.opacity(0.8))
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 10)
+    }
+    
     private var transcriptionView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
@@ -200,17 +255,18 @@ struct VoiceCaptureView: View {
                         .padding(.bottom, 5)
                 }
                 
-                // Preview mode shows simulated text
-                if isRunningInPreview && voiceCaptureManager.isRecording {
+                // 在预览模式下显示模拟文本
+                if isRunningInPreview {
                     Text("This is simulated speech recognition text in preview mode. Actual speech-to-text content will be shown on real devices.")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
-                        .lineSpacing(5)
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
+                    // 真实设备上显示实际的语音识别文本
                     Text(voiceCaptureManager.transcribedText)
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
-                        .lineSpacing(5)
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -219,50 +275,37 @@ struct VoiceCaptureView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 15) {
             Image(systemName: "waveform")
-                .font(.system(size: 60))
+                .font(.system(size: 50))
                 .foregroundColor(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.5))
             
-            if voiceCaptureManager.permissionStatus == .denied {
-                Text("permissionDeniedMessage".localized)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            } else {
-                Text("tapToStartListening".localized)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
+            Text("tapToStartListening".localized)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+            
+            Text("On real devices, this would show actual speech recognition results.")
+                .font(.system(size: 14))
+                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.7))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .opacity(isRunningInPreview ? 0.7 : 0)
         }
     }
     
     private func startRecording() {
-        // Simplified behavior in preview mode
-        if isRunningInPreview {
-            voiceCaptureManager.isRecording = true
-            voiceCaptureManager.transcribedText = "This is simulated recording text in preview mode. On real devices, this would show actual speech recognition results."
-            return
-        }
-        
-        // Request permissions when user taps the button
         voiceCaptureManager.startRecording { success, error in
-            if !success, let error = error {
-                self.alertMessage = error.localizedDescription
-                self.showingPermissionAlert = true
+            if !success {
+                alertMessage = error?.localizedDescription ?? "An unknown error occurred"
+                showingPermissionAlert = true
             }
         }
     }
     
     private func stopRecording() {
-        if isRunningInPreview {
-            voiceCaptureManager.isRecording = false
-            return
-        }
-        
         voiceCaptureManager.stopRecording()
     }
 }
