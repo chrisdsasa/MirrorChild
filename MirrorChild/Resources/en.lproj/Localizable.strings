@@ -11,7 +11,7 @@
 
 /* Voice feedback messages */
 "initialGreeting" = "Hello! I'm here to assist you with your device.";
-"listeningMessage" = "Can you hear me? I'm listening to you now.";
+"listeningMessage" = "Listening...";
 "voiceOffMessage" = "Voice assistance is off.";
 "screenOnMessage" = "I can see your screen now.";
 "screenOffMessage" = "Screen sharing is stopped.";
@@ -31,10 +31,14 @@
 "doneButton" = "Done";
 
 /* Voice Profile screen */
-"voiceProfileTitle" = "Voice Profile";
+"voiceProfileTitle" = "Voice Recognition";
 "voiceProfileInstructions" = "Record a sample of your voice or the voice you want to replicate. For best results, record at least 15 seconds of clear speech.";
 "uploadVoiceProfile" = "Upload Voice Sample";
 "savedRecordings" = "Saved Recordings";
+"startListening" = "Start Listening";
+"stopListening" = "Stop Listening";
+"tapToStartListening" = "Tap the button below to start voice recognition";
+"waitingForSpeech" = "Waiting for speech...";
 
 /* Voice Language Settings */
 "voiceLanguageTitle" = "Voice Language";
@@ -59,10 +63,10 @@
 "requestPermission" = "Grant Permission";
 "screenPermissionDenied" = "Screen recording permission was denied. Please enable it in your device settings to use this feature.";
 "permissionNeededMessage" = "Screen permission is needed before sharing";
-"permissionDeniedMessage" = "Screen recording permission is required. Please enable in Settings.";
+"permissionDeniedMessage" = "Microphone and speech recognition permissions are required. Please enable in Settings.";
 "openSettings" = "Open Settings";
-"openSettingsTitle" = "Enable Screen Recording";
-"openSettingsMessage" = "To enable screen recording, please go to Settings > Privacy > Screen Recording and enable permission for MirrorChild.";
+"openSettingsTitle" = "Enable Permissions";
+"openSettingsMessage" = "To enable voice recognition, please go to Settings > Privacy > Microphone and Speech Recognition, and enable permissions for MirrorChild.";
 "openSettingsButton" = "Open Settings";
 "cleaningUpMessage" = "Preparing screen sharing... Please wait";
 "capturingScreen" = "Capturing screen content...";
