@@ -42,6 +42,80 @@ enum VoiceLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+// 声音克隆API响应状态
+enum VoiceCloneStatus {
+    case notStarted
+    case uploading
+    case success(voiceId: String)
+    case failed(error: Error)
+    
+    var isUploading: Bool {
+        if case .uploading = self {
+            return true
+        }
+        return false
+    }
+    
+    var isSuccess: Bool {
+        if case .success = self {
+            return true
+        }
+        return false
+    }
+    
+    var voiceId: String? {
+        if case .success(let id) = self {
+            return id
+        }
+        return nil
+    }
+}
+
+// 录音文件模型
+struct SavedRecording: Identifiable, Codable {
+    var id: String
+    var fileName: String
+    var fileURL: URL
+    var creationDate: Date
+    var duration: TimeInterval
+    var description: String
+    
+    // 自定义编码和解码以处理URL类型
+    enum CodingKeys: String, CodingKey {
+        case id, fileName, fileURLString, creationDate, duration, description
+    }
+    
+    init(id: String = UUID().uuidString, fileName: String, fileURL: URL, duration: TimeInterval, description: String) {
+        self.id = id
+        self.fileName = fileName
+        self.fileURL = fileURL
+        self.creationDate = Date()
+        self.duration = duration
+        self.description = description
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        fileName = try container.decode(String.self, forKey: .fileName)
+        let urlString = try container.decode(String.self, forKey: .fileURLString)
+        fileURL = URL(fileURLWithPath: urlString)
+        creationDate = try container.decode(Date.self, forKey: .creationDate)
+        duration = try container.decode(TimeInterval.self, forKey: .duration)
+        description = try container.decode(String.self, forKey: .description)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(fileName, forKey: .fileName)
+        try container.encode(fileURL.path, forKey: .fileURLString)
+        try container.encode(creationDate, forKey: .creationDate)
+        try container.encode(duration, forKey: .duration)
+        try container.encode(description, forKey: .description)
+    }
+}
+
 class VoiceCaptureManager: NSObject, ObservableObject {
     static var shared: VoiceCaptureManager = {
         // 在初始化静态变量时检查是否在预览中
@@ -68,11 +142,32 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     private var audioEngine: AVAudioEngine?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     
+    // 语音配置相关属性
+    @Published var voiceSamples: [Data] = []
+    @Published var hasCompletedVoiceSetup: Bool = UserDefaults.standard.bool(forKey: "hasCompletedVoiceSetup")
+    
+    // 声音文件和克隆相关属性
+    @Published var voiceFileURL: URL?
+    @Published var cloneStatus: VoiceCloneStatus = .notStarted
+    @Published var currentRecordingDuration: TimeInterval = 0
+    private var recordingStartTime: Date?
+    private var audioRecorder: AVAudioRecorder?
+    private var recordingTimer: Timer?
+    
+    // 保存的录音列表
+    @Published var savedRecordings: [SavedRecording] = []
+    
     @Published var isRecording = false
     @Published var transcribedText = ""
     @Published var error: Error?
     @Published var permissionStatus: PermissionStatus = .notDetermined
     private var enablePunctuation = true // 控制是否启用标点符号功能
+    
+    // Public accessor methods for enablePunctuation
+    var isPunctuationEnabled: Bool {
+        get { enablePunctuation }
+        set { enablePunctuation = newValue }
+    }
     
     // 语言相关属性
     @Published var currentLanguage: VoiceLanguage = .chinese {
@@ -81,6 +176,14 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             updateSpeechRecognizer()
             // 保存用户选择
             UserDefaults.standard.set(currentLanguage.rawValue, forKey: "selectedVoiceLanguage")
+        }
+    }
+    
+    // 语音类型相关
+    @Published var selectedVoiceType: String = UserDefaults.standard.string(forKey: "selectedVoiceType") ?? "shimmer" {
+        didSet {
+            // 保存用户选择的语音类型
+            UserDefaults.standard.set(selectedVoiceType, forKey: "selectedVoiceType")
         }
     }
     
@@ -111,6 +214,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 self.currentLanguage = savedLanguage
             }
             
+            // 加载保存的录音列表
+            loadSavedRecordings()
+            
             return
         }
         
@@ -129,6 +235,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         
         // 设置应用状态监听
         setupNotifications()
+        
+        // 加载保存的录音列表
+        loadSavedRecordings()
     }
     
     // 设置通知监听
@@ -260,81 +369,43 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         currentLanguage = language
     }
     
+    // 检查麦克风权限
     func checkPermissionStatus() {
-        // 在预览模式下，假装有权限
         if isRunningInPreview {
-            self.permissionStatus = .authorized
+            permissionStatus = .authorized
             return
         }
         
-        // 检查语音识别状态
-        switch SFSpeechRecognizer.authorizationStatus() {
-        case .authorized:
-            self.permissionStatus = .authorized
-        case .denied, .restricted:
-            self.permissionStatus = .denied
-        case .notDetermined:
-            self.permissionStatus = .notDetermined
-        @unknown default:
-            self.permissionStatus = .notDetermined
-        }
+        let status = AVAudioSession.sharedInstance().recordPermission
         
-        // 初始检查时假设未获得麦克风权限
-        micPermissionGranted = false
+        switch status {
+        case .granted:
+            permissionStatus = .authorized
+            print("麦克风权限已授权")
+        case .denied:
+            permissionStatus = .denied
+            print("麦克风权限被拒绝")
+        case .undetermined:
+            permissionStatus = .notDetermined
+            print("麦克风权限未确定")
+        @unknown default:
+            permissionStatus = .notDetermined
+            print("麦克风权限状态未知")
+        }
     }
     
+    // 请求权限
     func requestPermissions(completion: @escaping (Bool) -> Void) {
-        // 在预览模式下总是返回授权成功
         if isRunningInPreview {
-            self.permissionStatus = .authorized
-            DispatchQueue.main.async {
-                completion(true)
-            }
+            completion(true)
             return
         }
         
-        // 一次性请求两种权限
-        var speechAuthorized = false
-        var micAuthorized = false
-        
-        // 请求语音识别权限
-        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
             DispatchQueue.main.async {
-                switch status {
-                case .authorized:
-                    speechAuthorized = true
-                case .denied, .restricted, .notDetermined:
-                    speechAuthorized = false
-                @unknown default:
-                    speechAuthorized = false
-                }
-                
-                // 根据iOS版本使用不同的API请求麦克风权限
-                if #available(iOS 17.0, *) {
-                    // 使用iOS 17及更高版本的新API
-                    AVAudioApplication.requestRecordPermission { granted in
-                        DispatchQueue.main.async {
-                            micAuthorized = granted
-                            
-                            // 两种权限都获得才算授权成功
-                            let isAuthorized = speechAuthorized && micAuthorized
-                            self?.permissionStatus = isAuthorized ? .authorized : .denied
-                            completion(isAuthorized)
-                        }
-                    }
-                } else {
-                    // 使用iOS 16及更早版本的API
-                    AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                        DispatchQueue.main.async {
-                            micAuthorized = granted
-                            
-                            // 两种权限都获得才算授权成功
-                            let isAuthorized = speechAuthorized && micAuthorized
-                            self?.permissionStatus = isAuthorized ? .authorized : .denied
-                            completion(isAuthorized)
-                        }
-                    }
-                }
+                self.permissionStatus = granted ? .authorized : .denied
+                print("麦克风权限请求结果: \(granted ? "已授权" : "已拒绝")")
+                completion(granted)
             }
         }
     }
@@ -546,6 +617,412 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         if audioEngine?.isRunning == true {
             audioEngine?.stop()
             audioEngine?.inputNode.removeTap(onBus: 0)
+        }
+    }
+    
+    // MARK: - 语音录制增强功能
+    
+    // 开始录制声音文件
+    func startVoiceFileRecording() {
+        // 如果在预览模式下，仅模拟
+        if isRunningInPreview {
+            isRecording = true
+            recordingStartTime = Date()
+            startTimerForRecording()
+            return
+        }
+        
+        // 请求必要的权限
+        requestPermissions { [weak self] granted in
+            guard let self = self, granted else {
+                print("语音录制权限被拒绝")
+                return
+            }
+            
+            do {
+                // 配置音频会话
+                let audioSession = AVAudioSession.sharedInstance()
+                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+                try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                
+                // 创建唯一的文件名
+                let fileName = "voice_recording_\(Date().timeIntervalSince1970).m4a"
+                
+                // 获取Documents目录路径
+                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let fileURL = documentsDirectory.appendingPathComponent(fileName)
+                self.voiceFileURL = fileURL
+                
+                print("将录制保存到: \(fileURL.path)")
+                
+                // 设置录音参数 - 高质量设置
+                let settings: [String: Any] = [
+                    AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                    AVSampleRateKey: 44100.0,
+                    AVNumberOfChannelsKey: 1,
+                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+                ]
+                
+                // 创建并配置录音器
+                self.audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
+                self.audioRecorder?.delegate = self
+                self.audioRecorder?.isMeteringEnabled = true
+                
+                // 开始录制
+                let recordingSuccess = self.audioRecorder?.record() ?? false
+                if recordingSuccess {
+                    self.isRecording = true
+                    self.recordingStartTime = Date()
+                    self.startTimerForRecording()
+                    print("开始录制声音文件")
+                } else {
+                    print("开始录制失败")
+                }
+                
+            } catch {
+                print("设置录音出错: \(error.localizedDescription)")
+                self.error = error
+            }
+        }
+    }
+    
+    // 启动计时器跟踪录制时长
+    private func startTimerForRecording() {
+        recordingTimer?.invalidate()
+        currentRecordingDuration = 0
+        
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self = self, let startTime = self.recordingStartTime else { return }
+            self.currentRecordingDuration = Date().timeIntervalSince(startTime)
+        }
+    }
+    
+    // 停止录制声音文件
+    func stopVoiceFileRecording() -> URL? {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        
+        guard !isRunningInPreview else {
+            isRecording = false
+            return nil
+        }
+        
+        // 停止录音
+        audioRecorder?.stop()
+        isRecording = false
+        
+        // 如果没有文件URL，说明录制可能失败了
+        guard let fileURL = voiceFileURL else {
+            print("录制失败：没有有效的文件URL")
+            return nil
+        }
+        
+        // 检查文件是否存在且有效
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            print("录制的文件不存在：\(fileURL.path)")
+            return nil
+        }
+        
+        // 获取文件大小
+        do {
+            let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
+            if let fileSize = attributes[.size] as? NSNumber {
+                print("录制完成，文件大小：\(fileSize.intValue) 字节")
+            }
+        } catch {
+            print("获取文件信息失败：\(error.localizedDescription)")
+        }
+        
+        // 实际应用中，可以在这里处理音频文件，比如转换格式或压缩
+        print("语音录制完成，文件保存在：\(fileURL.path)")
+        
+        return fileURL
+    }
+    
+    // MARK: - 声音克隆API功能
+    
+    // 上传声音样本到声音克隆API
+    func uploadVoiceToCloneAPI() {
+        guard let fileURL = voiceFileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
+            let error = NSError(domain: "com.mirrochild.voiceclone", code: 1, userInfo: [NSLocalizedDescriptionKey: "没有有效的语音样本文件"])
+            self.cloneStatus = .failed(error: error)
+            return
+        }
+        
+        // 更新状态为上传中
+        self.cloneStatus = .uploading
+        
+        // 创建请求
+        let apiURL = URL(string: "https://api.example.com/voice-clone")!
+        var request = URLRequest(url: apiURL)
+        request.httpMethod = "POST"
+        
+        // 创建multipart请求
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        // 你可能需要添加API密钥
+        request.setValue("YOUR_API_KEY", forHTTPHeaderField: "Authorization")
+        
+        // 创建请求体
+        var body = Data()
+        
+        // 添加语音类型参数
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"voice_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(selectedVoiceType)\r\n".data(using: .utf8)!)
+        
+        // 添加语音文件
+        do {
+            let audioData = try Data(contentsOf: fileURL)
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"voice_file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: audio/m4a\r\n\r\n".data(using: .utf8)!)
+            body.append(audioData)
+            body.append("\r\n".data(using: .utf8)!)
+        } catch {
+            self.cloneStatus = .failed(error: error)
+            print("读取语音文件失败：\(error.localizedDescription)")
+            return
+        }
+        
+        // 结束请求体
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        // 设置请求体
+        request.httpBody = body
+        
+        // 发送请求
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.cloneStatus = .failed(error: error)
+                    print("上传失败：\(error.localizedDescription)")
+                    return
+                }
+                
+                guard let data = data, let httpResponse = response as? HTTPURLResponse else {
+                    let error = NSError(domain: "com.mirrochild.voiceclone", code: 2, userInfo: [NSLocalizedDescriptionKey: "无效的服务器响应"])
+                    self.cloneStatus = .failed(error: error)
+                    return
+                }
+                
+                // 检查HTTP状态码
+                if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
+                    // 尝试解析响应
+                    do {
+                        // 假设API返回的是包含voice_id的JSON
+                        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                           let voiceId = json["voice_id"] as? String {
+                            // 保存返回的语音ID
+                            UserDefaults.standard.set(voiceId, forKey: "clonedVoiceId")
+                            self.cloneStatus = .success(voiceId: voiceId)
+                            print("声音克隆成功！声音ID：\(voiceId)")
+                            
+                            // 标记为已完成语音设置
+                            self.hasCompletedVoiceSetup = true
+                            UserDefaults.standard.set(true, forKey: "hasCompletedVoiceSetup")
+                        } else {
+                            // 返回格式不正确
+                            let error = NSError(domain: "com.mirrochild.voiceclone", code: 3, userInfo: [NSLocalizedDescriptionKey: "无效的API响应格式"])
+                            self.cloneStatus = .failed(error: error)
+                        }
+                    } catch {
+                        self.cloneStatus = .failed(error: error)
+                        print("解析API响应失败：\(error.localizedDescription)")
+                    }
+                } else {
+                    // 服务器返回错误
+                    let error = NSError(domain: "com.mirrochild.voiceclone", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "服务器返回错误：\(httpResponse.statusCode)"])
+                    self.cloneStatus = .failed(error: error)
+                    print("服务器返回错误：\(httpResponse.statusCode)")
+                }
+            }
+        }
+        
+        task.resume()
+    }
+    
+    // 获取已克隆的声音ID
+    func getClonedVoiceId() -> String? {
+        return UserDefaults.standard.string(forKey: "clonedVoiceId")
+    }
+    
+    // 重置声音克隆状态
+    func resetVoiceCloneStatus() {
+        cloneStatus = .notStarted
+        voiceFileURL = nil
+    }
+    
+    // MARK: - 保存的录音管理
+    
+    // 保存当前录音并添加到列表
+    func saveCurrentRecording(description: String = "") {
+        guard let fileURL = voiceFileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
+            print("没有有效的录音文件可保存")
+            return
+        }
+        
+        do {
+            // 获取文件属性
+            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+            let fileSize = attributes[FileAttributeKey.size] as? UInt64 ?? 0
+            
+            // 检查文件大小，确保文件不为空
+            if fileSize == 0 {
+                print("录音文件为空，不保存")
+                return
+            }
+            
+            // 获取实际录音时长
+            var actualDuration: TimeInterval = currentRecordingDuration
+            
+            // 使用AVAudioPlayer获取确切的录音时长
+            do {
+                let player = try AVAudioPlayer(contentsOf: fileURL)
+                actualDuration = player.duration
+                print("从播放器获取到的实际录音时长: \(actualDuration) 秒")
+            } catch {
+                print("无法获取录音时长，使用计时器时长: \(currentRecordingDuration) 秒")
+            }
+            
+            // 创建保存的录音对象
+            let fileName = fileURL.lastPathComponent
+            let savedRecording = SavedRecording(
+                fileName: fileName,
+                fileURL: fileURL,
+                duration: actualDuration,
+                description: description.isEmpty ? "录音 \(savedRecordings.count + 1)" : description
+            )
+            
+            // 添加到列表
+            savedRecordings.append(savedRecording)
+            
+            // 保存到本地存储
+            saveSavedRecordingsToStorage()
+            
+            print("已保存录音: \(savedRecording.description)，文件大小: \(fileSize) 字节，时长: \(actualDuration) 秒")
+            
+            // 验证文件是否可播放
+            verifyRecordingPlayability(fileURL: fileURL)
+            
+        } catch {
+            print("获取文件属性错误: \(error.localizedDescription)")
+        }
+    }
+    
+    // 验证录音是否可播放
+    private func verifyRecordingPlayability(fileURL: URL) {
+        do {
+            let audioPlayer = try AVAudioPlayer(contentsOf: fileURL)
+            print("录音验证成功，文件时长: \(audioPlayer.duration) 秒")
+        } catch {
+            print("录音验证失败，文件可能损坏: \(error.localizedDescription)")
+        }
+    }
+    
+    // 获取所有保存的录音
+    func getAllSavedRecordings() -> [SavedRecording] {
+        return savedRecordings
+    }
+    
+    // 删除指定录音
+    func deleteRecording(id: String) {
+        guard let index = savedRecordings.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        
+        let recording = savedRecordings[index]
+        
+        // 删除物理文件
+        do {
+            try FileManager.default.removeItem(at: recording.fileURL)
+            print("已删除文件: \(recording.fileURL.path)")
+        } catch {
+            print("删除录音文件失败: \(error.localizedDescription)")
+        }
+        
+        // 从列表中移除
+        savedRecordings.remove(at: index)
+        
+        // 更新存储
+        saveSavedRecordingsToStorage()
+    }
+    
+    // 将录音列表保存到存储
+    private func saveSavedRecordingsToStorage() {
+        do {
+            // 只保存文件路径和元数据，不保存文件内容
+            let data = try JSONEncoder().encode(savedRecordings)
+            UserDefaults.standard.set(data, forKey: "savedRecordings")
+        } catch {
+            print("保存录音列表失败: \(error.localizedDescription)")
+        }
+    }
+    
+    // 从存储加载录音列表
+    private func loadSavedRecordings() {
+        guard let data = UserDefaults.standard.data(forKey: "savedRecordings") else {
+            return
+        }
+        
+        do {
+            let decodedRecordings = try JSONDecoder().decode([SavedRecording].self, from: data)
+            
+            // 验证文件是否存在
+            let validRecordings = decodedRecordings.filter { recording in
+                FileManager.default.fileExists(atPath: recording.fileURL.path)
+            }
+            
+            savedRecordings = validRecordings
+            print("已加载 \(validRecordings.count) 个保存的录音")
+        } catch {
+            print("加载录音列表失败: \(error.localizedDescription)")
+        }
+    }
+    
+    // 播放指定录音
+    func playRecording(_ recording: SavedRecording, completion: @escaping (Bool) -> Void) {
+        do {
+            let audioPlayer = try AVAudioPlayer(contentsOf: recording.fileURL)
+            audioPlayer.prepareToPlay()
+            audioPlayer.play()
+            completion(true)
+        } catch {
+            print("播放录音失败: \(error.localizedDescription)")
+            completion(false)
+        }
+    }
+}
+
+// MARK: - AVAudioRecorderDelegate
+
+extension VoiceCaptureManager: AVAudioRecorderDelegate {
+    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+        if !flag {
+            print("录音未成功完成")
+            
+            // 如果录音失败，清除URL
+            if let url = voiceFileURL, FileManager.default.fileExists(atPath: url.path) {
+                do {
+                    try FileManager.default.removeItem(at: url)
+                    print("已删除不完整的录音文件")
+                } catch {
+                    print("删除不完整的录音文件失败：\(error.localizedDescription)")
+                }
+            }
+            
+            voiceFileURL = nil
+        }
+    }
+    
+    func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
+        if let error = error {
+            print("录音编码错误：\(error.localizedDescription)")
+            self.error = error
         }
     }
 } 
