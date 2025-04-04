@@ -11,15 +11,71 @@ import Speech
 import AVFoundation
 import UserNotifications
 
+// Define consistent accent color extension
+extension Color {
+    static let accentColor = Color(red: 0.45, green: 0.45, blue: 0.85)
+}
+
+// Add SplashScreenView definition before the MirrorChildApp struct
+struct SplashScreenView: View {
+    @State private var isActive = false
+    @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore = false
+    
+    var body: some View {
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.95, green: 0.95, blue: 0.98),
+                    Color(red: 0.9, green: 0.9, blue: 0.95)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                // App logo/icon
+                Image(systemName: "person.fill")
+                    .font(.system(size: 80))
+                    .foregroundColor(Color.accentColor)
+                    .padding()
+                
+                // App name
+                Text("MirrorChild")
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary.opacity(0.8))
+                
+                // Loading indicator
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .padding(.top, 30)
+            }
+        }
+        .onAppear {
+            // Simulate a splash screen delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                // Mark as having launched before
+                hasLaunchedBefore = true
+            }
+        }
+    }
+}
+
 @main
 struct MirrorChildApp: App {
     let persistenceController = PersistenceController.shared
-    
+
     // State for showing onboarding
     @State private var showOnboarding = false
+    @State private var isLoading = true
+    @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore = false
     
-    // Register app lifecycle events
-    @Environment(\.scenePhase) private var scenePhase
+    // Environment scene phase to detect app lifecycle changes
+    @Environment(\.scenePhase) var scenePhase
+    
+    // Only override accent color if the device is using Light Mode
+    @Environment(\.colorScheme) var colorScheme
     
     init() {
         // 检查是否首次启动，如果是则显示引导页
@@ -54,62 +110,69 @@ struct MirrorChildApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // 处理模拟器特殊情况下，直接显示简单的视图确保能看到内容
+            // Handle simulator special case, showing simple view to ensure content is visible
             #if targetEnvironment(simulator)
             ZStack {
-                // 简单的背景
+                // Simple background
                 Color(red: 0.95, green: 0.95, blue: 0.98)
                     .ignoresSafeArea()
                     .onAppear {
-                        print("模拟器视图已加载")
+                        print("Simulator view loaded")
                     }
                 
-                // 直接显示内容视图
+                // Directly show content view
                 ContentView()
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                    .accentColor(Color.accentColor) // Set global accent color
                 
-                // 如果需要显示引导页，在最上层显示
+                // If onboarding needed, show at top layer
                 if showOnboarding {
                     SimpleOnboardingView(isPresented: $showOnboarding)
                         .transition(.opacity)
-                        .zIndex(1) // 确保在最上层
-                        .animation(.easeInOut(duration: 0.5), value: showOnboarding) // 添加淡入淡出动画
+                        .zIndex(1) // Ensure on top
+                        .animation(.easeInOut(duration: 0.5), value: showOnboarding)
                 }
             }
             #else
             ZStack {
-                // 确保ContentView能立即显示
-            ContentView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                    .onAppear {
-                        // 应用已启动，可以执行非关键的操作
-                        print("Content view appeared")
-                        
-                        // 延迟请求权限，避免启动时就触发权限请求
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.requestPermissions()
-                            self.setupPermissions() 
+                // For real devices, show splash screen first if not launched before
+                if !hasLaunchedBefore {
+                    SplashScreenView()
+                } else {
+                    // Main content view
+                    ContentView()
+                        .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                        .accentColor(Color.accentColor) // Set global accent color
+                        .onAppear {
+                            // App launched, can perform non-critical operations
+                            print("Content view appeared")
+                            
+                            // Delay permission requests to avoid triggering at startup
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                self.requestPermissions()
+                                self.setupPermissions() 
+                            }
                         }
-                    }
-                    .onChange(of: scenePhase) { oldPhase, newPhase in
-                        if newPhase == .active {
-                            // App became active
-                            print("App became active")
-                        } else if newPhase == .inactive {
-                            // App became inactive
-                            print("App became inactive")
-                        } else if newPhase == .background {
-                            // App went to background
-                            print("App went to background")
+                        .onChange(of: scenePhase) { oldPhase, newPhase in
+                            if newPhase == .active {
+                                // App became active
+                                print("App became active")
+                            } else if newPhase == .inactive {
+                                // App became inactive
+                                print("App became inactive")
+                            } else if newPhase == .background {
+                                // App went to background
+                                print("App went to background")
+                            }
                         }
+                    
+                    // Overlay the onboarding view if needed
+                    if showOnboarding {
+                        SimpleOnboardingView(isPresented: $showOnboarding)
+                            .transition(.opacity)
+                            .zIndex(1) // Ensure it appears on top
+                            .animation(.easeInOut(duration: 0.5), value: showOnboarding)
                     }
-                
-                // Overlay the onboarding view if needed
-                if showOnboarding {
-                    SimpleOnboardingView(isPresented: $showOnboarding)
-                        .transition(.opacity)
-                        .zIndex(1) // Ensure it appears on top
-                        .animation(.easeInOut(duration: 0.5), value: showOnboarding) // 添加淡入淡出动画
                 }
             }
             #endif
@@ -400,22 +463,12 @@ struct SimpleOnboardingView: View {
                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                     )
                 }
-                .buttonStyle(ScaleButtonStyle())  // 添加自定义按钮样式
+                .buttonStyle(DesignSystem.ButtonStyles.ScaleButton())  // Add custom button style
                 .padding(.bottom, 50)
                 .contentShape(Rectangle())  // 扩大点击区域
                 .allowsHitTesting(true)  // 确保按钮可点击
             }
             .padding()
         }
-    }
-}
-
-// 自定义按钮样式，提供轻触反馈
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(), value: configuration.isPressed)
     }
 }

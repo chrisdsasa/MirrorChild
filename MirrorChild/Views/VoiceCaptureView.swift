@@ -2,10 +2,6 @@ import SwiftUI
 import Speech
 
 struct VoiceCaptureView: View {
-    // 使用全局颜色常量
-    private let accentColor = Color.accentRebeccaPurple
-    private let surfaceColor = Color.surfaceThistle
-    
     @StateObject private var voiceCaptureManager = VoiceCaptureManager.shared
     @State private var showingPermissionAlert = false
     @State private var alertMessage = ""
@@ -19,151 +15,157 @@ struct VoiceCaptureView: View {
     
     var body: some View {
         ZStack {
-            // Background with subtle gradient
+            // Modern gradient background
             LinearGradient(
                 gradient: Gradient(colors: [
-                    surfaceColor.opacity(0.2),
-                    surfaceColor.opacity(0.3),
-                    surfaceColor.opacity(0.2)
+                    DesignSystem.Colors.surface,
+                    DesignSystem.Colors.surfaceSecondary
                 ]),
                 startPoint: .top,
                 endPoint: .bottom
             ).ignoresSafeArea()
             
-            // Cherry blossom decorative elements (subtle)
+            // Subtle decorative elements
             GeometryReader { geometry in
                 ZStack {
-                    // Top right cherry blossom
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(accentColor.opacity(0.2))
-                        .position(x: geometry.size.width - 40, y: 60)
+                    Circle()
+                        .fill(DesignSystem.Colors.accent.opacity(0.05))
+                        .frame(width: 300, height: 300)
+                        .blur(radius: 50)
+                        .offset(x: geometry.size.width * 0.3, y: -geometry.size.height * 0.2)
                     
-                    // Bottom left cherry blossom
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(accentColor.opacity(0.15))
-                        .position(x: 30, y: geometry.size.height - 100)
+                    Circle()
+                        .fill(DesignSystem.Colors.accent.opacity(0.05))
+                        .frame(width: 250, height: 250)
+                        .blur(radius: 40)
+                        .offset(x: -geometry.size.width * 0.2, y: geometry.size.height * 0.3)
                 }
             }
             
-            VStack(spacing: 20) {
-                // Title with elegant, minimalist design
+            VStack(spacing: DesignSystem.Layout.spacingLarge) {
+                // Navigation header with title and dismiss button
                 HStack {
-                    Text("voiceProfileTitle".localized)
-                        .font(.system(size: 24, weight: .medium))
-                        .tracking(1)
-                        .foregroundColor(accentColor)
+                    Text("Voice Input")
+                        .font(DesignSystem.Typography.title)
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
                     
                     Spacer()
                     
                     Button(action: {
                         dismiss()
                     }) {
-                        Text("doneButton".localized)
-                            .font(.system(size: 16, weight: .medium))
-                            .tracking(1)
-                            .foregroundColor(accentColor)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 15)
-                            .background(
-                                Capsule()
-                                    .stroke(accentColor.opacity(0.3), lineWidth: 1)
-                            )
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                    }
+                    .buttonStyle(DesignSystem.ButtonStyles.IconButton())
+                }
+                .padding(.top, DesignSystem.Layout.spacingLarge)
+                .padding(.horizontal, DesignSystem.Layout.spacingLarge)
+                
+                // Auto punctuation toggle
+                Toggle(isOn: $voiceCaptureManager.enablePunctuation) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Auto Punctuation")
+                            .font(DesignSystem.Typography.bodyBold)
+                            .foregroundColor(DesignSystem.Colors.textPrimary)
+                        
+                        Text("Add punctuation marks automatically")
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
                     }
                 }
-                .padding(.top, 20)
-                .padding(.horizontal)
-                
-                // 标点符号开关
-                Toggle(isOn: $voiceCaptureManager.enablePunctuation) {
-                    Text("自动添加标点符号")
-                        .font(.system(size: 16))
-                        .foregroundColor(accentColor.opacity(0.8))
-                }
-                .padding(.horizontal, 25)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(surfaceColor.opacity(0.7))
-                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                )
-                .padding(.horizontal, 20)
-                .toggleStyle(SwitchToggleStyle(tint: accentColor))
+                .padding(.horizontal, DesignSystem.Layout.spacingLarge)
+                .toggleStyle(SwitchToggleStyle(tint: DesignSystem.Colors.accent))
                 
                 // Status indicator
-                HStack {
+                HStack(spacing: DesignSystem.Layout.spacingMedium) {
                     Circle()
                         .fill(voiceCaptureManager.isRecording ? 
-                              Color(red: 0.4, green: 0.6, blue: 0.5) : Color(red: 0.8, green: 0.4, blue: 0.4))
-                        .frame(width: 12, height: 12)
+                              DesignSystem.Colors.success : DesignSystem.Colors.error)
+                        .frame(width: 10, height: 10)
                     
                     Text(voiceCaptureManager.isRecording ? 
-                         "listeningMessage".localized : "voiceOffMessage".localized)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(accentColor.opacity(0.7))
+                         "Listening..." : "Voice recognition inactive")
+                        .font(DesignSystem.Typography.body)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                 }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 20)
+                .padding(.vertical, DesignSystem.Layout.spacingSmall)
+                .padding(.horizontal, DesignSystem.Layout.spacingMedium)
                 .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(surfaceColor.opacity(0.5))
-                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                    RoundedRectangle(cornerRadius: DesignSystem.Layout.radiusLarge)
+                        .fill(DesignSystem.Colors.glassMaterial)
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignSystem.Layout.radiusLarge)
+                        .stroke(DesignSystem.Colors.textTertiary.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal, DesignSystem.Layout.spacingLarge)
                 
                 // Transcription area
-                VStack {
+                Group {
                     if voiceCaptureManager.isRecording || !voiceCaptureManager.transcribedText.isEmpty {
                         transcriptionView
-                            .padding()
                     } else {
                         emptyStateView
                     }
                 }
                 .frame(height: 400)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(surfaceColor.opacity(0.7))
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(accentColor.opacity(0.2), lineWidth: 1)
-                        )
-                )
-                .padding(.horizontal, 20)
+                .cardStyle()
+                .padding(.horizontal, DesignSystem.Layout.spacingLarge)
                 
-                // Control buttons
-                mainControlButton
+                // Control button
+                Button(action: {
+                    if voiceCaptureManager.isRecording {
+                        stopRecording()
+                    } else {
+                        startRecording()
+                    }
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(voiceCaptureManager.isRecording ? 
+                                  DesignSystem.Colors.error : 
+                                  DesignSystem.Colors.accent)
+                            .frame(width: 80, height: 80)
+                            .shadow(radius: 5, x: 0, y: 3)
+                        
+                        Image(systemName: voiceCaptureManager.isRecording ? "stop.fill" : "mic.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.white)
+                    }
+                }
+                .buttonStyle(DesignSystem.ButtonStyles.IconButton())
+                .accessibilityLabel(voiceCaptureManager.isRecording ? "Stop Recording" : "Start Recording")
                 
                 // Open settings button (if permission denied)
                 if voiceCaptureManager.permissionStatus == .denied {
                     Button(action: {
                         showingSettingsAlert = true
                     }) {
-                        Text("openSettings".localized)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(accentColor)
-                            .padding(.top, 10)
+                        Text("Open Settings")
+                            .font(DesignSystem.Typography.body)
+                            .foregroundColor(DesignSystem.Colors.accent)
                     }
+                    .buttonStyle(DesignSystem.ButtonStyles.SecondaryButton())
                 }
                 
                 Spacer()
             }
-            .padding()
+            .padding(.vertical)
         }
         .alert(isPresented: $showingPermissionAlert) {
             Alert(
-                title: Text("permissionRequired".localized),
+                title: Text("Permission Required"),
                 message: Text(alertMessage),
                 dismissButton: .default(Text("OK"))
             )
         }
         .alert(isPresented: $showingSettingsAlert) {
             Alert(
-                title: Text("openSettingsTitle".localized),
-                message: Text("openSettingsMessage".localized),
-                primaryButton: .default(Text("openSettingsButton".localized)) {
+                title: Text("Open Settings"),
+                message: Text("Please enable microphone access in Settings to use voice recognition."),
+                primaryButton: .default(Text("Open Settings")) {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
                     }
@@ -173,10 +175,10 @@ struct VoiceCaptureView: View {
         }
     }
     
-    // 转录视图
+    // Transcription view with live waveform
     private var transcriptionView: some View {
-        VStack(spacing: 15) {
-            // 实时波形显示
+        VStack(spacing: DesignSystem.Layout.spacingMedium) {
+            // Live waveform display
             if voiceCaptureManager.isRecording {
                 LiveWaveformView()
                     .frame(height: 60)
@@ -186,179 +188,97 @@ struct VoiceCaptureView: View {
             
             ScrollView {
                 Text(voiceCaptureManager.transcribedText)
-                    .font(.system(size: 24))
-                    .foregroundColor(accentColor.opacity(0.8))
+                    .font(DesignSystem.Typography.body)
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
                     .padding()
                     .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(surfaceColor.opacity(0.3))
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
-        )
     }
     
-    // 主控制按钮
-    private var mainControlButton: some View {
-        Button(action: {
-            if voiceCaptureManager.isRecording {
-                stopRecording()
-            } else {
-                startRecording()
-            }
-        }) {
-            ZStack {
-                Circle()
-                    .fill(
-                        voiceCaptureManager.isRecording ? 
-                        Color(red: 0.8, green: 0.4, blue: 0.4) : 
-                        accentColor
-                    )
-                    .frame(width: 100, height: 100)
-                    .shadow(color: accentColor.opacity(0.3), radius: 5, x: 0, y: 3)
-                
-                Image(systemName: voiceCaptureManager.isRecording ? "stop.fill" : "mic.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(.white)
-            }
-        }
-        .padding(.bottom, 30)
-    }
-    
-    // 空状态视图
+    // Empty state view
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignSystem.Layout.spacingLarge) {
             Image(systemName: "waveform")
-                .font(.system(size: 80))
-                .foregroundColor(accentColor.opacity(0.5))
+                .font(.system(size: 60))
+                .foregroundColor(DesignSystem.Colors.textTertiary)
+                .symbolEffect(.pulse, options: .repeating, value: voiceCaptureManager.isRecording)
             
             if voiceCaptureManager.permissionStatus == .denied {
-                Text("permissionDeniedMessage".localized)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(accentColor.opacity(0.7))
+                Text("Microphone access denied")
+                    .font(DesignSystem.Typography.subtitle)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             } else {
-                Text("tapToStartListening".localized)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(accentColor.opacity(0.7))
+                Text("Tap the microphone button to start listening")
+                    .font(DesignSystem.Typography.subtitle)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
         }
     }
     
+    // Start recording function
     private func startRecording() {
-        // Simplified behavior in preview mode
         if isRunningInPreview {
-            voiceCaptureManager.isRecording = true
-            voiceCaptureManager.transcribedText = "This is simulated recording text in preview mode. On real devices, this would show actual speech recognition results."
             return
         }
         
-        // Request permissions when user taps the button
-        voiceCaptureManager.startRecording { success, error in
-            if !success, let error = error {
-                self.alertMessage = error.localizedDescription
-                self.showingPermissionAlert = true
+        VoiceCaptureManager.shared.startRecording { success, error in
+            if success {
+                // Recording started successfully
+            } else if let error = error {
+                print("Recording failed: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    alertMessage = error.localizedDescription
+                    showingPermissionAlert = true
+                }
             }
         }
     }
     
+    // Stop recording function
     private func stopRecording() {
-        if isRunningInPreview {
-            voiceCaptureManager.isRecording = false
-            return
+        if !isRunningInPreview {
+            VoiceCaptureManager.shared.stopRecording()
         }
-        
-        voiceCaptureManager.stopRecording()
     }
 }
 
-// Preview provider
+// MARK: - Live Waveform
+
+struct LiveWaveformView: View {
+    @State private var waveform: [CGFloat] = Array(repeating: 0.1, count: 30)
+    
+    private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(waveform.indices, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(DesignSystem.Colors.accent)
+                    .frame(width: 3, height: waveform[index] * 60)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.5), value: waveform[index])
+            }
+        }
+        .onReceive(timer) { _ in
+            // Generate random waveform for visualization
+            for i in 0..<waveform.count {
+                withAnimation {
+                    waveform[i] = CGFloat.random(in: 0.1...1.0)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Preview
+
 struct VoiceCaptureView_Previews: PreviewProvider {
     static var previews: some View {
         VoiceCaptureView()
-    }
-}
-
-// 实时波形视图
-struct LiveWaveformView: View {
-    // 使用全局颜色常量
-    private let accentColor = Color.accentRebeccaPurple
-    private let surfaceColor = Color.surfaceThistle
-    
-    @StateObject private var voiceCaptureManager = VoiceCaptureManager.shared
-    @State private var waveform: [CGFloat] = Array(repeating: 10, count: 40)
-    private let timer = Timer.publish(every: 0.03, on: .main, in: .common).autoconnect()
-    
-    // 彩色渐变效果
-    private var waveGradient: LinearGradient {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                accentColor.opacity(0.7),
-                accentColor,
-                accentColor.opacity(0.8)
-            ]), 
-            startPoint: .leading, 
-            endPoint: .trailing
-        )
-    }
-    
-    var body: some View {
-        ZStack {
-            // 背景网格线
-            VStack(spacing: 20) {
-                ForEach(0..<3) { _ in
-                    Rectangle()
-                        .fill(accentColor.opacity(0.1))
-                        .frame(height: 1)
-                }
-            }
-            .frame(maxHeight: .infinity)
-            
-            // 波形
-            HStack(spacing: 2) {
-                ForEach(0..<waveform.count, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(waveGradient)
-                        .frame(width: 3, height: waveform[index])
-                        .animation(.easeInOut(duration: 0.2), value: waveform[index])
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .onReceive(timer) { _ in
-            // 更新波形, 左移数组并添加新值
-            var newWaveform = Array(waveform.dropFirst())
-            
-            // 将音频电平转换为视觉高度
-            let height = normalizedAudioLevel(from: voiceCaptureManager.currentAudioLevel)
-            newWaveform.append(height)
-            
-            waveform = newWaveform
-        }
-    }
-    
-    // 将音频电平转换为波形高度
-    private func normalizedAudioLevel(from level: Float) -> CGFloat {
-        // 音频电平通常为负分贝值，0分贝是最大值
-        let minDb: Float = -50.0
-        let maxDb: Float = -10.0
-        let minHeight: CGFloat = 5.0
-        let maxHeight: CGFloat = 60.0
-        
-        // 确保电平在有效范围内
-        let clampedLevel = max(min(level, maxDb), minDb)
-        
-        // 将分贝值归一化到0-1的范围
-        let normalizedLevel = (clampedLevel - minDb) / (maxDb - minDb)
-        
-        // 使用更强的非线性映射使效果更明显
-        let height = minHeight + (pow(CGFloat(normalizedLevel), 0.7) * (maxHeight - minHeight))
-        
-        return height
     }
 } 
