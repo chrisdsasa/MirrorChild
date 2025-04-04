@@ -327,109 +327,71 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
     }
     
     func startCapture(completion: @escaping (Bool, Error?) -> Void) {
-        // 明确检查是否在主线程执行UI更新
-        if !Thread.isMainThread {
-            DispatchQueue.main.async {
-                self.startCapture(completion: completion)
-            }
+        // 如果已经在录制中，返回成功
+        if isRecording {
+            completion(true, nil)
             return
         }
         
-        // 在预览模式下模拟成功
+        // 重置状态
+        previewFrames.removeAll()
+        capturedFrames.removeAll()
+        error = nil
+        
+        // 在预览模式下简单切换状态，无需实际操作
         if isRunningInPreview {
             isRecording = true
-            startGeneratingPreviewFrames()
             completion(true, nil)
+            // 即使在预览模式也发送通知
+            NotificationCenter.default.post(name: .didStartRecording, object: nil)
             return
         }
-        
-        // 更严格地检查录制是否可用
-        guard isScreenRecordingAvailable, recorder.isAvailable else {
-            let error = NSError(domain: "com.mirrochild.screenrecording", 
-                               code: 1,
-                               userInfo: [NSLocalizedDescriptionKey: "Screen recording is not available on this device."])
-            completion(false, error)
-            return
-        }
-        
-        // 避免多次启动
-        if isRecording || isCapturing {
-            completion(true, nil)
-            return
-        }
-        
-        // 创建新的捕获会话ID
-        currentSessionId = UUID().uuidString
-        
-        // 清空已存储的帧
-        capturedFrames.removeAll()
         
         // 添加额外保护，防止在模拟器上崩溃
         #if targetEnvironment(simulator)
-        // 在模拟器中，只模拟成功而不实际调用API
+        print("警告: 在模拟器上运行，屏幕捕获功能有限")
         isRecording = true
-        startGeneratingPreviewFrames() 
         completion(true, nil)
+        NotificationCenter.default.post(name: .didStartRecording, object: nil)
         return
         #else
-        // First ensure we have permissions
-        requestScreenCapturePermission { [weak self] granted in
-            guard let self = self else { 
-                completion(false, nil)
+        
+        // 停止任何现有的录制会话
+        stopExistingRecordingSessions()
+        
+        // 确保设备支持屏幕录制
+        guard isScreenRecordingAvailable, recorder.isAvailable else {
+            let error = NSError(domain: "ScreenCaptureManager", 
+                               code: 101, 
+                               userInfo: [NSLocalizedDescriptionKey: "设备不支持屏幕录制"])
+            self.error = error
+            completion(false, error)
                 return 
             }
+        
+        // 创建会话目录
+        setupSessionDirectory()
+        
+        // 设置并开始录屏
+        startCaptureSession { [weak self] success, error in
+            guard let self = self else { return }
             
-            if !granted {
-                let error = NSError(domain: "com.mirrochild.screenrecording", 
-                                   code: 2,
-                                   userInfo: [NSLocalizedDescriptionKey: "Screen recording permission was denied."])
+            if success {
+                // 启动预览帧生成
+                self.startGeneratingPreviewFrames()
+                
+                // 开始后台任务
+                self.beginBackgroundTask()
+                
+                print("屏幕捕获已开始")
+                
+                // 发送开始录制通知
+                NotificationCenter.default.post(name: .didStartRecording, object: nil)
+                
+                completion(true, nil)
+            } else {
+                self.error = error
                 completion(false, error)
-                return
-            }
-            
-            // 确保在主线程执行
-            DispatchQueue.main.async {
-                // 捕获任何可能的异常
-                autoreleasepool {
-                    // Now that we have permission, start the actual recording
-                    self.recorder.startCapture { [weak self] (buffer, bufferType, error) in
-                        if let error = error {
-                            DispatchQueue.main.async {
-                                self?.error = error
-                                self?.isRecording = false
-                            }
-                            return
-                        }
-                        
-                        // 仅处理视频缓冲区
-                        guard bufferType == .video, let strongSelf = self else { return }
-                        
-                        // 将CMSampleBuffer转换为UIImage并保存
-                        strongSelf.processAndStoreVideoFrame(buffer)
-                        
-                    } completionHandler: { [weak self] error in
-                        guard let self = self else { return }
-                        
-                        DispatchQueue.main.async {
-                            if let error = error {
-                                self.error = error
-                                self.isRecording = false
-                                completion(false, error)
-                            } else {
-                                self.isRecording = true
-                                self.isCapturing = true
-                                
-                                // 开始后台任务，确保应用进入后台时继续捕获
-                                self.beginBackgroundTask()
-                                
-                                // For demo purposes only - simulate receiving frames
-                                self.startGeneratingPreviewFrames()
-                                
-                                completion(true, nil)
-                            }
-                        }
-                    }
-                }
             }
         }
         #endif
@@ -446,44 +408,62 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
         frameProcessingQueue.async { [weak self] in
             guard let self = self else { return }
             
-            // 转换CMSampleBuffer为UIImage
+            // 转换CMSampleBuffer为UIImage，增加错误处理
             let ciImage = CIImage(cvPixelBuffer: imageBuffer)
             let context = CIContext()
-            guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
             
-            // 缩小图像以节省内存
-            let uiImage = UIImage(cgImage: cgImage).scaledForPreview()
-            
-            // 只对部分帧进行存储（例如每秒一帧）以节省空间
-            if self.shouldStoreThisFrame() {
-                // 创建已捕获的帧对象
-                let frame = CapturedFrame(
-                    timestamp: Date(),
-                    image: uiImage,
-                    transcribedText: nil, // 后续与语音识别文本关联
-                    sessionId: self.currentSessionId
-                )
-                
-                // 保存帧到文件系统
-                if let directory = self.captureSessionDirectory {
-                    _ = frame.saveToFile(in: directory)
+            do {
+                guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
+                    print("无法从CIImage创建CGImage")
+                    return
                 }
                 
-                // 添加到内存中的帧缓存
-                DispatchQueue.main.async {
-                    self.capturedFrames.append(frame)
-                    
-                    // 如果超出最大存储量，移除最旧的帧
-                    if self.capturedFrames.count > self.maxStoredFrames {
-                        self.capturedFrames.removeFirst()
-                    }
-                    
-                    // 更新预览帧（仅保留几帧用于UI展示）
-                    if self.previewFrames.count >= self.maxFrameCount {
-                        self.previewFrames.remove(at: 0)
-                    }
-                    self.previewFrames.append(uiImage)
+                // 创建UIImage并确保尺寸合理
+                let originalImage = UIImage(cgImage: cgImage)
+                
+                // 验证图像尺寸
+                guard originalImage.size.width > 0, originalImage.size.height > 0,
+                      originalImage.size.width.isFinite, originalImage.size.height.isFinite else {
+                    print("警告: 原始图像尺寸无效: \(originalImage.size)")
+                    return
                 }
+                
+                // 缩小图像以节省内存，这里会执行额外的尺寸验证
+                let uiImage = originalImage.scaledForPreview()
+                
+                // 只对部分帧进行存储（例如每秒一帧）以节省空间
+                if self.shouldStoreThisFrame() {
+                    // 创建已捕获的帧对象
+                    let frame = CapturedFrame(
+                        timestamp: Date(),
+                        image: uiImage,
+                        transcribedText: nil, // 后续与语音识别文本关联
+                        sessionId: self.currentSessionId
+                    )
+                    
+                    // 保存帧到文件系统
+                    if let directory = self.captureSessionDirectory {
+                        _ = frame.saveToFile(in: directory)
+                    }
+                    
+                    // 添加到内存中的帧缓存
+                    DispatchQueue.main.async {
+                        self.capturedFrames.append(frame)
+                        
+                        // 如果超出最大存储量，移除最旧的帧
+                        if self.capturedFrames.count > self.maxStoredFrames {
+                            self.capturedFrames.removeFirst()
+                        }
+                        
+                        // 更新预览帧（仅保留几帧用于UI展示）
+                        if self.previewFrames.count >= self.maxFrameCount {
+                            self.previewFrames.remove(at: 0)
+                        }
+                        self.previewFrames.append(uiImage)
+                    }
+                }
+            } catch {
+                print("处理视频帧时出错: \(error.localizedDescription)")
             }
         }
     }
@@ -521,19 +501,19 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
         }
     }
     
-    // 准备发送数据到OpenAI API
+    // 修改prepareDataForOpenAI方法，确保正确处理无帧情况
     func prepareDataForOpenAI(completion: @escaping ([CapturedFrame]?, Error?) -> Void) {
-        // 如果没有捕获的帧，返回错误
-        guard !capturedFrames.isEmpty else {
-            let error = NSError(domain: "com.mirrochild.screenrecording", 
-                              code: 3,
-                              userInfo: [NSLocalizedDescriptionKey: "没有可用的屏幕捕获数据。"])
-            completion(nil, error)
+        // 检查是否有捕获的帧
+        if capturedFrames.isEmpty {
+            // 不返回错误，而是返回空数组，让OpenAIService处理仅文本模式
+            print("屏幕捕获帧为空，将使用仅文本模式")
+            completion([], nil) // 返回空数组而不是nil
             return
         }
         
-        // 返回捕获的帧供外部处理
-        completion(capturedFrames, nil)
+        // 选择最近的若干帧（例如最近10帧）
+        let recentFrames = Array(capturedFrames.suffix(10))
+        completion(recentFrames, nil)
     }
     
     func stopCapture() {
@@ -555,6 +535,8 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
         // 在预览模式下仅重置状态
         if isRunningInPreview {
             isRecording = false
+            // 发送通知
+            NotificationCenter.default.post(name: .didStopRecording, object: nil)
             return
         }
         
@@ -562,12 +544,16 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
         #if targetEnvironment(simulator)
         isRecording = false
         isCapturing = false
+        // 发送通知
+        NotificationCenter.default.post(name: .didStopRecording, object: nil)
         return
         #else
         // 防止在设备不支持时执行
         guard isScreenRecordingAvailable, recorder.isAvailable else {
             isRecording = false
             isCapturing = false
+            // 发送通知
+            NotificationCenter.default.post(name: .didStopRecording, object: nil)
             return
         }
         
@@ -581,6 +567,9 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
                     }
                     self?.isRecording = false
                     self?.isCapturing = false
+                    
+                    // 发送通知
+                    NotificationCenter.default.post(name: .didStopRecording, object: nil)
                 }
             }
         }
@@ -675,14 +664,108 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
             self.error = error
         }
     }
+    
+    // 创建会话目录
+    private func setupSessionDirectory() {
+        // 重置会话ID
+        currentSessionId = UUID().uuidString
+        
+        // 确保捕获目录存在
+        if let captureDir = captureSessionDirectory {
+            if !FileManager.default.fileExists(atPath: captureDir.path) {
+                do {
+                    try FileManager.default.createDirectory(at: captureDir, withIntermediateDirectories: true)
+                    print("已创建屏幕捕获目录: \(captureDir.path)")
+                } catch {
+                    print("创建屏幕捕获目录失败: \(error)")
+                }
+            }
+        }
+    }
+    
+    // 开始捕获会话
+    private func startCaptureSession(completion: @escaping (Bool, Error?) -> Void) {
+        // 确保在主线程执行
+        if !Thread.isMainThread {
+            DispatchQueue.main.async {
+                self.startCaptureSession(completion: completion)
+            }
+            return
+        }
+        
+        // 请求屏幕录制权限
+        requestScreenCapturePermission { [weak self] granted in
+            guard let self = self else { 
+                completion(false, nil)
+                return 
+            }
+            
+            if !granted {
+                let error = NSError(domain: "com.mirrochild.screenrecording", 
+                                   code: 2,
+                                   userInfo: [NSLocalizedDescriptionKey: "屏幕录制权限被拒绝。"])
+                self.error = error
+                completion(false, error)
+                return
+            }
+            
+            // 确保在主线程执行
+            DispatchQueue.main.async {
+                // 捕获任何可能的异常
+                autoreleasepool {
+                    // 现在我们有权限了，开始实际录制
+                    self.recorder.startCapture { [weak self] (buffer, bufferType, error) in
+                        if let error = error {
+                            DispatchQueue.main.async {
+                                self?.error = error
+                                self?.isRecording = false
+                                self?.isCapturing = false
+                            }
+                            return
+                        }
+                        
+                        // 仅处理视频缓冲区
+                        guard bufferType == .video, let strongSelf = self else { return }
+                        
+                        // 将CMSampleBuffer转换为UIImage并保存
+                        strongSelf.processAndStoreVideoFrame(buffer)
+                        
+                    } completionHandler: { [weak self] error in
+                        guard let self = self else { return }
+                        
+                        DispatchQueue.main.async {
+                            if let error = error {
+                                self.error = error
+                                self.isRecording = false
+                                self.isCapturing = false
+                                completion(false, error)
+                            } else {
+                                self.isRecording = true
+                                self.isCapturing = true
+                                completion(true, nil)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // MARK: - UIImage Extensions
 
 extension UIImage {
-    // Scale down images for the preview
+    // Scale down images for the preview with improved dimension validation
     func scaledForPreview() -> UIImage {
         let maxDimension: CGFloat = 300
+        
+        // 验证原始尺寸的有效性
+        guard self.size.width > 0, self.size.height > 0,
+              self.size.width.isFinite, self.size.height.isFinite else {
+            print("警告: 检测到无效的图像尺寸: \(self.size)，使用默认图像")
+            // 返回一个有效的替代图像
+            return createDefaultImage()
+        }
         
         // Calculate new size
         let originalSize = self.size
@@ -697,11 +780,266 @@ extension UIImage {
                              height: originalSize.height * ratio)
         }
         
+        // 再次验证计算后的尺寸
+        guard newSize.width > 0, newSize.height > 0,
+              newSize.width.isFinite, newSize.height.isFinite else {
+            print("警告: 缩放后的尺寸无效: \(newSize)，使用默认图像")
+            return createDefaultImage()
+        }
+        
         // Draw and return the resized image
         UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
         defer { UIGraphicsEndImageContext() }
         
         self.draw(in: CGRect(origin: .zero, size: newSize))
-        return UIGraphicsGetImageFromCurrentImageContext() ?? self
+        return UIGraphicsGetImageFromCurrentImageContext() ?? createDefaultImage()
+    }
+    
+    // 创建一个默认的占位图像
+    private func createDefaultImage() -> UIImage {
+        let size = CGSize(width: 200, height: 300)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            // 使用浅灰色填充
+            UIColor.lightGray.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            
+            // 添加错误标记
+            let text = "图像错误"
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 16),
+                .foregroundColor: UIColor.white
+            ]
+            
+            let textSize = text.size(withAttributes: attributes)
+            let textRect = CGRect(
+                x: (size.width - textSize.width) / 2,
+                y: (size.height - textSize.height) / 2,
+                width: textSize.width,
+                height: textSize.height
+            )
+            
+            text.draw(in: textRect, withAttributes: attributes)
+        }
+    }
+}
+
+// 添加ScreenRecorder类用于屏幕录制
+class ScreenRecorder: NSObject {
+    private let recorder = RPScreenRecorder.shared()
+    private var assetWriter: AVAssetWriter?
+    private var videoInput: AVAssetWriterInput?
+    private var audioInput: AVAssetWriterInput?
+    private var micInput: AVAssetWriterInput?
+    private var isRecording = false
+    private var outputURL: URL?
+    
+    override init() {
+        super.init()
+    }
+    
+    func startRecording(to outputURL: URL, completion: @escaping (Error?) -> Void) {
+        // 确保之前的录制已经停止
+        if isRecording {
+            stopRecording { _, error in
+                if let error = error {
+                    print("Error stopping previous recording: \(error.localizedDescription)")
+                }
+            }
+        }
+        
+        self.outputURL = outputURL
+        
+        // 检查录制权限
+        if !recorder.isAvailable {
+            completion(NSError(domain: "ScreenRecorder", code: 1, userInfo: [NSLocalizedDescriptionKey: "Screen recording is not available"]))
+            return
+        }
+        
+        // 确保输出目录存在
+        do {
+            let outputDirectory = outputURL.deletingLastPathComponent()
+            if !FileManager.default.fileExists(atPath: outputDirectory.path) {
+                try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+            }
+            
+            // 如果输出文件已存在，先删除
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                try FileManager.default.removeItem(at: outputURL)
+                print("Removed existing file at: \(outputURL.path)")
+            }
+        } catch {
+            print("Error preparing output directory: \(error)")
+            completion(error)
+            return
+        }
+        
+        do {
+            // 初始化AVAssetWriter
+            assetWriter = try AVAssetWriter(url: outputURL, fileType: .mp4)
+            
+            // 设置视频输入，提高视频质量
+            let videoSettings: [String: Any] = [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: UIScreen.main.bounds.width * UIScreen.main.scale,
+                AVVideoHeightKey: UIScreen.main.bounds.height * UIScreen.main.scale,
+                AVVideoCompressionPropertiesKey: [
+                    AVVideoAverageBitRateKey: 6000000, // 提高比特率
+                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
+                ]
+            ]
+            
+            videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+            videoInput?.expectsMediaDataInRealTime = true
+            
+            // 设置应用音频输入
+            let audioSettings: [String: Any] = [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVNumberOfChannelsKey: 2,
+                AVSampleRateKey: 44100,
+                AVEncoderBitRateKey: 128000
+            ]
+            
+            audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+            audioInput?.expectsMediaDataInRealTime = true
+            
+            // 设置麦克风音频输入
+            micInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+            micInput?.expectsMediaDataInRealTime = true
+            
+            if let videoInput = videoInput, assetWriter?.canAdd(videoInput) == true {
+                assetWriter?.add(videoInput)
+            }
+            
+            if let audioInput = audioInput, assetWriter?.canAdd(audioInput) == true {
+                assetWriter?.add(audioInput)
+            }
+            
+            if let micInput = micInput, assetWriter?.canAdd(micInput) == true {
+                assetWriter?.add(micInput)
+            }
+            
+            // 开始写入会话
+            assetWriter?.startWriting()
+            assetWriter?.startSession(atSourceTime: CMTime.zero)
+            
+            // 允许麦克风录制（如果用户有需要）
+            recorder.isMicrophoneEnabled = true
+            
+            // 开始录制
+            recorder.startCapture(handler: { [weak self] sampleBuffer, sampleBufferType, error in
+                guard let self = self, self.isRecording else { return }
+                
+                if let error = error {
+                    print("Error during capture: \(error.localizedDescription)")
+                    return
+                }
+                
+                switch sampleBufferType {
+                case .video:
+                    if let videoInput = self.videoInput, videoInput.isReadyForMoreMediaData {
+                        videoInput.append(sampleBuffer)
+                    }
+                case .audioApp:
+                    if let audioInput = self.audioInput, audioInput.isReadyForMoreMediaData {
+                        audioInput.append(sampleBuffer)
+                    }
+                case .audioMic:
+                    if let micInput = self.micInput, micInput.isReadyForMoreMediaData {
+                        micInput.append(sampleBuffer)
+                    }
+                @unknown default:
+                    break
+                }
+            }, completionHandler: { [weak self] error in
+                if let error = error {
+                    print("Screen capture start error: \(error.localizedDescription)")
+                    completion(error)
+                } else {
+                    self?.isRecording = true
+                    completion(nil)
+                }
+            })
+            
+        } catch {
+            print("Error setting up asset writer: \(error.localizedDescription)")
+            completion(error)
+        }
+    }
+    
+    func stopRecording(completion: @escaping (URL?, Error?) -> Void) {
+        guard isRecording else {
+            completion(nil, NSError(domain: "ScreenRecorder", code: 2, userInfo: [NSLocalizedDescriptionKey: "Not recording"]))
+            return
+        }
+        
+        print("正在停止录制...")
+        isRecording = false
+        
+        // 保存录制URL的副本，因为在完成时会被清除
+        let recordedURL = outputURL
+        
+        recorder.stopCapture { [weak self] error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error stopping screen capture: \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            print("录制已停止，正在完成写入...")
+            
+            self.videoInput?.markAsFinished()
+            self.audioInput?.markAsFinished()
+            self.micInput?.markAsFinished()
+            
+            self.assetWriter?.finishWriting { [weak self] in
+                guard let self = self else { return }
+                
+                if self.assetWriter?.status == .completed {
+                    print("文件写入完成：\(String(describing: recordedURL?.path))")
+                    
+                    // 验证文件是否存在和可用
+                    if let url = recordedURL, FileManager.default.fileExists(atPath: url.path) {
+                        // 获取文件大小
+                        do {
+                            let attr = try FileManager.default.attributesOfItem(atPath: url.path)
+                            if let fileSize = attr[.size] as? UInt64 {
+                                print("录制文件大小: \(fileSize) 字节")
+                                
+                                // 如果文件太小，可能是录制失败
+                                if fileSize < 1000 {
+                                    completion(nil, NSError(domain: "ScreenRecorder", code: 4, userInfo: [NSLocalizedDescriptionKey: "录制的文件太小或损坏"]))
+                                    return
+                                }
+                            }
+                        } catch {
+                            print("无法获取文件属性: \(error)")
+                        }
+                        
+                        completion(url, nil)
+                    } else {
+                        completion(nil, NSError(domain: "ScreenRecorder", code: 5, userInfo: [NSLocalizedDescriptionKey: "录制的文件不存在"]))
+                    }
+                } else if let error = self.assetWriter?.error {
+                    print("写入过程错误: \(error.localizedDescription)")
+                    completion(nil, error)
+                } else {
+                    print("未知写入错误")
+                    completion(nil, NSError(domain: "ScreenRecorder", code: 3, userInfo: [NSLocalizedDescriptionKey: "Unknown error"]))
+                }
+                
+                self.assetWriter = nil
+                self.videoInput = nil
+                self.audioInput = nil
+                self.micInput = nil
+                self.outputURL = nil
+            }
+        }
+    }
+    
+    func isCurrentlyRecording() -> Bool {
+        return isRecording
     }
 } 

@@ -9,6 +9,9 @@ struct VoiceCaptureView: View {
     @State private var isBlinking = false
     @Environment(\.dismiss) private var dismiss
     
+    // 存储API响应文本
+    @State private var apiResponseText = ""
+    
     // Check if running in preview mode
     private var isRunningInPreview: Bool {
         ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
@@ -44,7 +47,7 @@ struct VoiceCaptureView: View {
                 }
             }
             
-            VStack(spacing: 20) {
+            VStack(spacing: 15) {
                 // Title with elegant, minimalist design
                 HStack {
                     Spacer()
@@ -78,27 +81,64 @@ struct VoiceCaptureView: View {
                         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                 )
                 
-                // Transcription area
-                VStack {
-                    if voiceCaptureManager.isRecording || !voiceCaptureManager.transcribedText.isEmpty {
-                        transcriptionView
-                            .padding()
-                    } else {
-                        emptyStateView
-                    }
-                }
-                .frame(height: 400)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white.opacity(0.9))
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                        .overlay(
+                // 分隔视图为两个部分
+                GeometryReader { geo in
+                    VStack(spacing: 15) {
+                        // 用户语音转写区域 - 上半部分
+                        VStack {
+                            Text("您的语音")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal)
+                                .padding(.top, 8)
+                            
+                            if voiceCaptureManager.isRecording || !voiceCaptureManager.transcribedText.isEmpty {
+                                transcriptionView
+                                    .padding()
+                                    .frame(height: geo.size.height / 2 - 40)
+                            } else {
+                                emptyStateView
+                                    .frame(height: geo.size.height / 2 - 40)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .background(
                             RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.3), lineWidth: 1)
+                                .fill(Color.white.opacity(0.9))
+                                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.3), lineWidth: 1)
+                                )
                         )
-                )
-                .padding(.horizontal, 20)
+                        
+                        // AI响应区域 - 下半部分
+                        VStack {
+                            Text("AI助手")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal)
+                                .padding(.top, 8)
+                            
+                            apiResponseView
+                                .padding()
+                                .frame(height: geo.size.height / 2 - 40)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.9))
+                                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                }
                 
                 // Control buttons
                 HStack(spacing: 30) {
@@ -126,67 +166,54 @@ struct VoiceCaptureView: View {
                                 .padding(.horizontal, 30)
                                 .background(
                                     Capsule()
-                                        .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                                        .fill(Color.accentColor)
                                 )
                                 .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
                         }
                     }
                 }
-                .padding(.top, 20)
-                
-                // Open settings button (if permission denied)
-                if voiceCaptureManager.permissionStatus == .denied {
-                    Button(action: {
-                        showingSettingsAlert = true
-                    }) {
-                        Text("openSettings".localized)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
-                            .padding(.top, 10)
-                    }
-                }
-                
-                Spacer()
+                .padding(.top, 10)
+                .padding(.bottom, 30)
             }
-            .padding()
         }
         .onAppear {
-            // 创建定时器，每秒切换一次闪烁状态
-            let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    isBlinking.toggle()
-                }
+            // 检查麦克风权限
+            checkPermissions()
+            
+            // 设置闪烁效果动画
+            withAnimation(Animation.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                isBlinking = true
             }
-            // 将timer存储到RunLoop中，确保即使在滚动时也能继续工作
-            RunLoop.current.add(timer, forMode: .common)
-            // 保存timer引用以便在视图消失时清理
-            TimerManager.shared.voiceBlinkTimer = timer
+            
+            // 订阅OpenAI响应
+            OpenAIService.shared.onNewResponse = { response in
+                self.apiResponseText = response
+            }
         }
         .onDisappear {
-            // 清理定时器
-            TimerManager.shared.voiceBlinkTimer?.invalidate()
-            TimerManager.shared.voiceBlinkTimer = nil
+            // 取消订阅OpenAI响应
+            OpenAIService.shared.onNewResponse = nil
         }
         .alert(isPresented: $showingPermissionAlert) {
-            Alert(
-                title: Text("permissionRequired".localized),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
+            if showingSettingsAlert {
+                return Alert(
+                    title: Text("permissionNeeded".localized),
+                    message: Text(alertMessage),
+                    primaryButton: .default(Text("openSettings".localized)) {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    },
+                    secondaryButton: .cancel(Text("cancel".localized))
+                )
+            } else {
+                return Alert(
+                    title: Text("permissionDenied".localized),
+                    message: Text(alertMessage),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
         }
-        .alert(isPresented: $showingSettingsAlert) {
-            Alert(
-                title: Text("openSettingsTitle".localized),
-                message: Text("openSettingsMessage".localized),
-                primaryButton: .default(Text("openSettingsButton".localized)) {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                },
-                secondaryButton: .cancel()
-            )
-        }
-        .preferredColorScheme(.light)
     }
     
     private var transcriptionView: some View {
@@ -211,6 +238,27 @@ struct VoiceCaptureView: View {
                         .font(.system(size: 18, weight: .regular))
                         .foregroundColor(Color(red: 0.25, green: 0.25, blue: 0.3))
                         .lineSpacing(5)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+    }
+    
+    private var apiResponseView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                if apiResponseText.isEmpty {
+                    Text("AI助手将在您说话后回应...")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundColor(Color.gray)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 30)
+                } else {
+                    Text(apiResponseText)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.3))
+                        .lineSpacing(6)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -264,6 +312,16 @@ struct VoiceCaptureView: View {
         }
         
         voiceCaptureManager.stopRecording()
+    }
+    
+    private func checkPermissions() {
+        voiceCaptureManager.checkPermissionStatus()
+        
+        if voiceCaptureManager.permissionStatus == .denied {
+            alertMessage = "需要麦克风访问权限才能使用语音功能。请在设置中允许访问麦克风。"
+            showingSettingsAlert = true
+            showingPermissionAlert = true
+        }
     }
 }
 

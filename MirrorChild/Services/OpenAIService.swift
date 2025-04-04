@@ -1,8 +1,9 @@
 import Foundation
 import UIKit
 import Combine
+import AVFoundation
 
-class OpenAIService {
+class OpenAIService: NSObject {
     static let shared = OpenAIService()
     
     // 定义错误类型
@@ -14,11 +15,392 @@ class OpenAIService {
     
     // OpenAI API Key - 实际使用中应该从更安全的地方获取
     private var apiKey: String? {
-        return UserDefaults.standard.string(forKey: "openai_api_key")
+        // 从UserDefaults获取，如果不存在则使用默认测试key
+        // 注意：这仅用于测试/演示目的，生产环境中应通过更安全的方式管理API密钥
+        if let savedKey = UserDefaults.standard.string(forKey: "openai_api_key"), !savedKey.isEmpty {
+            return savedKey
+        } else {
+            // 默认测试用API密钥 - 仅用于演示，实际部署时应移除
+            return "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"
+        }
     }
     
-    // API基础URL
-    private let baseURL = "https://api.openai.com/v1/chat/completions"
+    // API基础URL - 使用responses接口，它支持多模态输入
+    private let baseURL = "https://api.openai.com/v1/responses"
+    
+    // 定时器和状态变量
+    private var autoSendTimer: Timer?
+    private var isAutoSendEnabled = false
+    private var lastSentText = ""
+    private var lastResponseText = ""
+    private var isProcessing = false
+    
+    // 取消订阅
+    private var cancellables = Set<AnyCancellable>()
+    
+    // 响应回调 - 外部可以设置这个回调来接收实时API响应
+    var onNewResponse: ((String) -> Void)?
+    
+    // 音频播放器
+    private var audioPlayer: AVAudioPlayer?
+    
+    // 初始化时设置观察者
+    private override init() {
+        super.init()
+        setupObservers()
+    }
+    
+    private func setupObservers() {
+        // 监听VoiceCaptureManager和ScreenCaptureManager的状态
+        NotificationCenter.default.publisher(for: .didStartRecording)
+            .sink { [weak self] _ in
+                self?.startAutoSend()
+            }
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: .didStopRecording)
+            .sink { [weak self] _ in
+                self?.stopAutoSend()
+            }
+            .store(in: &cancellables)
+    }
+    
+    // 启动自动发送功能
+    func startAutoSend() {
+        // 确保在主线程上操作UI和Timer
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.startAutoSend()
+            }
+            return
+        }
+        
+        guard !isAutoSendEnabled else { return }
+        
+        isAutoSendEnabled = true
+        lastSentText = ""
+        
+        // 创建一个定时器，每2秒发送一次请求
+        autoSendTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.autoSendDataToAPI()
+        }
+        
+        // 确保定时器在滚动等情况下仍然触发
+        if let timer = autoSendTimer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
+        
+        print("已启动自动发送功能，将每2秒发送一次数据到OpenAI")
+    }
+    
+    // 停止自动发送功能
+    func stopAutoSend() {
+        // 确保在主线程上操作UI和Timer
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.stopAutoSend()
+            }
+            return
+        }
+        
+        guard isAutoSendEnabled else { return }
+        
+        autoSendTimer?.invalidate()
+        autoSendTimer = nil
+        isAutoSendEnabled = false
+        lastSentText = ""
+        lastResponseText = ""
+        
+        print("已停止自动发送功能")
+    }
+    
+    // 自动发送数据到API
+    private func autoSendDataToAPI() {
+        // 避免重复处理
+        guard !isProcessing else {
+            print("上一次请求仍在处理中，跳过本次发送")
+            return
+        }
+        
+        // 获取当前的截图和文本
+        let screenCaptureManager: ScreenCaptureManager = ScreenCaptureManager.shared
+        let voiceCaptureManager: VoiceCaptureManager = VoiceCaptureManager.shared
+        
+        // 确保至少一种录制在进行中
+        if !screenCaptureManager.isRecording && !voiceCaptureManager.isRecording {
+            print("录制未在进行中，停止自动发送")
+            stopAutoSend()
+            return
+        }
+        
+        // 获取当前文本
+        let currentText = voiceCaptureManager.transcribedText
+        
+        // 如果文本为空，也跳过但不停止发送（可能在等待用户开始说话）
+        if currentText.isEmpty {
+            print("文本为空，等待用户输入...")
+            return
+        }
+        
+        // 移除文本变化检查，确保无论文本是否变化都发送请求
+        // 记录是否有变化，仅用于日志
+        let hasTextChanged = currentText != lastSentText
+        if hasTextChanged {
+            print("文本已变化，发送新请求")
+        } else {
+            print("文本未变化，继续发送请求...")
+        }
+        
+        // 更新最后发送的文本
+        lastSentText = currentText
+        
+        // 获取当前帧
+        screenCaptureManager.prepareDataForOpenAI { [weak self] frames, error in
+            guard let self = self else { return }
+            
+            // 如果出现错误或没有可用帧，切换到仅文本模式
+            if let error = error {
+                print("准备数据时出错: \(error.localizedDescription)")
+                // 设置处理标志，避免其他请求插入
+                self.isProcessing = true
+                
+                // 使用仅文本模式发送请求
+                self.sendTextOnlyToOpenAI(text: currentText) { result in
+                    // 处理完成，重置标志
+                    self.isProcessing = false
+                    
+                    switch result {
+                    case .success(let responseText):
+                        // 如果响应有变化，更新并通知
+                        if responseText != self.lastResponseText {
+                            self.lastResponseText = responseText
+                            DispatchQueue.main.async {
+                                self.onNewResponse?(responseText)
+                                print("收到仅文本模式新响应: \(responseText.prefix(100))...")
+                            }
+                        } else {
+                            print("仅文本模式API响应未变化")
+                        }
+                    case .failure(let error):
+                        print("仅文本模式API请求失败: \(error.localizedDescription)")
+                    }
+                }
+                return
+            }
+            
+            // 检查frames是否为空
+            if frames == nil || frames!.isEmpty {
+                print("没有可用的屏幕帧，切换到仅文本模式")
+                // 设置处理标志，避免其他请求插入
+                self.isProcessing = true
+                
+                // 使用仅文本模式发送请求
+                self.sendTextOnlyToOpenAI(text: currentText) { result in
+                    // 处理完成，重置标志
+                    self.isProcessing = false
+                    
+                    switch result {
+                    case .success(let responseText):
+                        // 如果响应有变化，更新并通知
+                        if responseText != self.lastResponseText {
+                            self.lastResponseText = responseText
+                            DispatchQueue.main.async {
+                                self.onNewResponse?(responseText)
+                                print("收到仅文本模式新响应: \(responseText.prefix(100))...")
+                            }
+                        } else {
+                            print("仅文本模式API响应未变化")
+                        }
+                    case .failure(let error):
+                        print("仅文本模式API请求失败: \(error.localizedDescription)")
+                    }
+                }
+                return
+            }
+            
+            // 开始处理，设置标志
+            self.isProcessing = true
+            
+            // 执行API请求
+            print("正在发送数据到OpenAI API: \(frames?.count ?? 0)个帧, 文本: \(currentText)")
+            self.sendScreenCaptureAndVoiceData(frames: frames ?? [], transcribedText: currentText) { result in
+                // 处理完成，重置标志
+                self.isProcessing = false
+                
+                switch result {
+                case .success(let responseText):
+                    // 如果响应有变化，更新并通知
+                    if responseText != self.lastResponseText {
+                        self.lastResponseText = responseText
+                        DispatchQueue.main.async {
+                            self.onNewResponse?(responseText)
+                            print("收到新响应: \(responseText.prefix(100))...")
+                        }
+                    } else {
+                        print("API响应未变化")
+                    }
+                case .failure(let error):
+                    print("API请求失败: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    // 添加一个仅发送文本的方法，当没有可用的截图时使用
+    private func sendTextOnlyToOpenAI(text: String, completion: @escaping (Result<String, Error>) -> Void) {
+        print("开始执行仅文本模式请求...")
+        
+        // 验证API密钥
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            let error = NSError(domain: "com.mirrochild.openai", 
+                               code: 1, 
+                               userInfo: [NSLocalizedDescriptionKey: "OpenAI API密钥未设置"])
+            completion(.failure(error))
+            return
+        }
+        
+        // 设置处理标志
+        isProcessing = true
+        
+        // 创建请求URL
+        guard let url = URL(string: baseURL) else {
+            isProcessing = false
+            let error = NSError(domain: "com.mirrochild.openai", 
+                               code: 3, 
+                               userInfo: [NSLocalizedDescriptionKey: "无效的API URL"])
+            completion(.failure(error))
+            return
+        }
+        
+        // 创建请求
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // 构建系统指令
+        let instructions = """
+        你是一个帮助老年人使用手机的助手。用户提出了问题但没有提供屏幕截图。
+        请根据用户的语音输入，以简单易懂的方式回答他们的问题。
+        可能的问题包括：
+        1. 关于手机功能的基本问答
+        2. 城市、地点或常识类问题
+        3. 如何使用某项功能或应用
+        4. 日常生活中的各种咨询
+        
+        请用简洁、亲切、耐心的语言回答，避免使用技术术语。如果问题涉及手机操作，可以提供通用的步骤指导。
+        """
+        
+        // 准备仅文本输入内容
+        let textContent: [[String: Any]] = [
+            [
+                "type": "input_text",
+                "text": "用户问题: \(text)"
+            ]
+        ]
+        
+        // 准备请求体 - 使用Responses API格式
+        let requestBody: [String: Any] = [
+            "model": "gpt-4o",
+            "instructions": instructions,
+            "input": [
+                [
+                    "role": "user",
+                    "content": textContent
+                ]
+            ],
+            "max_output_tokens": 1000
+        ]
+        
+        // 序列化请求体
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        } catch {
+            isProcessing = false
+            let serializationError = NSError(domain: "com.mirrochild.openai", 
+                                           code: 8, 
+                                           userInfo: [NSLocalizedDescriptionKey: "序列化请求体失败: \(error.localizedDescription)"])
+            completion(.failure(serializationError))
+            return
+        }
+        
+        // 发送请求
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            // 重置处理标志
+            self.isProcessing = false
+            
+            if let error = error {
+                let networkError = NSError(domain: "com.mirrochild.openai", 
+                                          code: 9, 
+                                          userInfo: [NSLocalizedDescriptionKey: "网络请求错误: \(error.localizedDescription)"])
+                completion(.failure(networkError))
+                return
+            }
+            
+            guard let data = data else {
+                let noDataError = NSError(domain: "com.mirrochild.openai", 
+                                         code: 4, 
+                                         userInfo: [NSLocalizedDescriptionKey: "没有接收到响应数据"])
+                completion(.failure(noDataError))
+                return
+            }
+            
+            // 解析响应
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let output = json["output"] as? [[String: Any]],
+                   let message = output.first(where: { ($0["type"] as? String) == "message" }),
+                   let content = message["content"] as? [[String: Any]],
+                   let textOutput = content.first(where: { ($0["type"] as? String) == "output_text" }),
+                   let text = textOutput["text"] as? String {
+                    
+                    print("OpenAI仅文本模式响应成功! 输出文本:\n\(text)")
+                    
+                    // 使用TTS朗读响应文本
+                    self.textToSpeech(text: text) { ttsResult in
+                        switch ttsResult {
+                        case .success:
+                            print("TTS朗读成功")
+                        case .failure(let ttsError):
+                            print("TTS朗读失败: \(ttsError.localizedDescription)")
+                        }
+                    }
+                    
+                    completion(.success(text))
+                } else {
+                    // 尝试获取错误信息
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let error = json["error"] as? [String: Any],
+                       let message = error["message"] as? String {
+                        
+                        let apiError = NSError(domain: "com.mirrochild.openai", 
+                                             code: 5, 
+                                             userInfo: [NSLocalizedDescriptionKey: "API错误: \(message)"])
+                        completion(.failure(apiError))
+                    } else {
+                        // 打印原始响应以便调试
+                        if let jsonString = String(data: data, encoding: .utf8) {
+                            print("无法解析的API响应:\n\(jsonString)")
+                        }
+                        
+                        let parseError = NSError(domain: "com.mirrochild.openai", 
+                                               code: 6, 
+                                               userInfo: [NSLocalizedDescriptionKey: "无法解析API响应"])
+                        completion(.failure(parseError))
+                    }
+                }
+            } catch {
+                let parseError = NSError(domain: "com.mirrochild.openai", 
+                                       code: 7, 
+                                       userInfo: [NSLocalizedDescriptionKey: "解析响应时出错: \(error.localizedDescription)"])
+                completion(.failure(parseError))
+            }
+        }
+        
+        task.resume()
+    }
     
     // 发送屏幕捕获数据和语音文本到OpenAI
     func sendScreenCaptureAndVoiceData(frames: [ScreenCaptureManager.CapturedFrame], 
@@ -33,54 +415,62 @@ class OpenAIService {
             return
         }
         
-        // 准备要发送的帧
-        prepareFramesForUpload(frames) { [weak self] result in
+        // 直接处理和发送帧
+        prepareFramesForResponsesAPI(frames, transcribedText: transcribedText) { [weak self] result in
             guard let self = self else { return }
             
             switch result {
-            case .success(let frameDescriptions):
-                // 使用帧描述和文本创建请求
-                self.createChatCompletionRequest(frameDescriptions: frameDescriptions, 
-                                               transcribedText: transcribedText,
-                                               completion: completion)
+            case .success(let content):
+                // 使用多模态输入创建请求
+                self.createResponsesRequest(content: content, completion: completion)
             case .failure(let error):
                 completion(.failure(error))
             }
         }
     }
     
-    // 处理帧以准备上传到OpenAI
-    private func prepareFramesForUpload(_ frames: [ScreenCaptureManager.CapturedFrame], 
-                                        completion: @escaping (Result<[String], Error>) -> Void) {
-        // 选择代表性帧（例如，每隔5秒选择一帧）
+    // 处理帧以准备用于Responses API的输入
+    private func prepareFramesForResponsesAPI(_ frames: [ScreenCaptureManager.CapturedFrame], 
+                                            transcribedText: String,
+                                            completion: @escaping (Result<[[String: Any]], Error>) -> Void) {
+        // 选择代表性帧（最多5帧，以符合API限制并减少数据量）
         let selectedFrames = selectRepresentativeFrames(frames)
         
-        // 将图像转换为base64字符串
-        var frameDescriptions: [String] = []
+        // 将图像转换为多模态内容数组
+        var contentItems: [[String: Any]] = []
         
-        for frame in selectedFrames {
+        // 首先添加文本消息
+        contentItems.append([
+            "type": "input_text",
+            "text": "以下是我手机屏幕的截图，请帮我理解如何使用这个应用。"
+        ])
+        
+        // 最多处理5个帧，避免请求过大
+        for frame in selectedFrames.prefix(5) {
             if let imageData = frame.image.jpegData(compressionQuality: 0.5) {
-                // 将图像转换为base64字符串(但在这里不需要存储它)
-                _ = imageData.base64EncodedString()
+                let base64String = imageData.base64EncodedString()
                 
-                // 创建带时间戳的帧描述
-                let formatter = DateFormatter()
-                formatter.dateFormat = "HH:mm:ss"
-                let timeString = formatter.string(from: frame.timestamp)
+                // 添加图像内容
+                let imageContent: [String: Any] = [
+                    "type": "input_image",
+                    "image_url": "data:image/jpeg;base64,\(base64String)",
+                    "detail": "high"  // 使用高详细度来获取更好的分析
+                ]
                 
-                // 添加帧描述
-                let description = "时间点 \(timeString)的屏幕截图: [BASE64_IMAGE_DATA]"
-                frameDescriptions.append(description)
-                
-                // 如果帧有关联的文本，也添加进去
-                if let text = frame.transcribedText, !text.isEmpty {
-                    frameDescriptions.append("用户在\(timeString)说: \"\(text)\"")
-                }
+                contentItems.append(imageContent)
             }
         }
         
+        // 如果有语音文本，添加到最后
+        if !transcribedText.isEmpty {
+            contentItems.append([
+                "type": "input_text",
+                "text": "我的问题是: \(transcribedText)"
+            ])
+        }
+        
         // 如果没有有效的帧，返回错误
-        if frameDescriptions.isEmpty {
+        if contentItems.count <= 1 { // 只有初始文本消息
             let error = NSError(domain: "com.mirrochild.openai", 
                                code: 2, 
                                userInfo: [NSLocalizedDescriptionKey: "没有有效的屏幕捕获数据可处理"])
@@ -88,7 +478,7 @@ class OpenAIService {
             return
         }
         
-        completion(.success(frameDescriptions))
+        completion(.success(contentItems))
     }
     
     // 选择代表性帧以减少数据量
@@ -122,10 +512,9 @@ class OpenAIService {
         return selectedFrames
     }
     
-    // 创建并发送聊天完成请求
-    private func createChatCompletionRequest(frameDescriptions: [String], 
-                                             transcribedText: String,
-                                             completion: @escaping (Result<String, Error>) -> Void) {
+    // 创建并发送Responses API请求
+    private func createResponsesRequest(content: [[String: Any]], 
+                                      completion: @escaping (Result<String, Error>) -> Void) {
         // 创建请求URL
         guard let url = URL(string: baseURL) else {
             let error = NSError(domain: "com.mirrochild.openai", 
@@ -142,21 +531,22 @@ class OpenAIService {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
         // 构建系统指令
-        let systemPrompt = """
-        你是一个帮助老年人使用手机的助手。请根据以下屏幕截图和用户语音输入，提供简单易懂的指导，帮助用户完成他们想要的操作。
+        let instructions = """
+        你是一个帮助老年人使用手机的助手。请根据用户提供的屏幕截图和语音输入，提供简单易懂的指导，帮助用户完成他们想要的操作。
         请用简洁明了的语言，避免使用技术术语。给出步骤清晰的指示。
         """
         
-        // 准备请求体
-        let messages: [[String: String]] = [
-            ["role": "system", "content": systemPrompt],
-            ["role": "user", "content": "以下是我的手机屏幕截图和我说的话，请帮我理解如何使用这个应用: \n\n" + frameDescriptions.joined(separator: "\n\n") + "\n\n我说的话: " + transcribedText]
-        ]
-        
+        // 准备请求体 - 使用Responses API格式
         let requestBody: [String: Any] = [
-            "model": "gpt-4-vision-preview",  // 使用支持图像的模型
-            "messages": messages,
-            "max_tokens": 1000
+            "model": "gpt-4o",  // 使用支持图像的模型
+            "instructions": instructions,
+            "input": [
+                [
+                    "role": "user",
+                    "content": content
+                ]
+            ],
+            "max_output_tokens": 1000
         ]
         
         // 序列化请求体
@@ -182,15 +572,29 @@ class OpenAIService {
                 return
             }
             
-            // 解析响应
+            // 解析响应 - Responses API的响应格式
             do {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let choices = json["choices"] as? [[String: Any]],
-                   let firstChoice = choices.first,
-                   let message = firstChoice["message"] as? [String: Any],
-                   let content = message["content"] as? String {
+                   let output = json["output"] as? [[String: Any]],
+                   let message = output.first(where: { ($0["type"] as? String) == "message" }),
+                   let content = message["content"] as? [[String: Any]],
+                   let textOutput = content.first(where: { ($0["type"] as? String) == "output_text" }),
+                   let text = textOutput["text"] as? String {
                     
-                    completion(.success(content))
+                    // 记录完整响应到控制台，以便调试
+                    print("OpenAI响应成功! 输出文本:\n\(text)")
+                    
+                    // 使用TTS朗读响应文本
+                    self.textToSpeech(text: text) { ttsResult in
+                        switch ttsResult {
+                        case .success:
+                            print("TTS朗读成功")
+                        case .failure(let ttsError):
+                            print("TTS朗读失败: \(ttsError.localizedDescription)")
+                        }
+                    }
+                    
+                    completion(.success(text))
                 } else {
                     // 尝试获取错误信息
                     if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -202,6 +606,11 @@ class OpenAIService {
                                              userInfo: [NSLocalizedDescriptionKey: "API错误: \(message)"])
                         completion(.failure(apiError))
                     } else {
+                        // 打印原始响应以便调试
+                        if let jsonString = String(data: data, encoding: .utf8) {
+                            print("无法解析的API响应:\n\(jsonString)")
+                        }
+                        
                         let parseError = NSError(domain: "com.mirrochild.openai", 
                                                code: 6, 
                                                userInfo: [NSLocalizedDescriptionKey: "无法解析API响应"])
@@ -239,26 +648,168 @@ class OpenAIService {
                                          code: 7, 
                                          userInfo: [NSLocalizedDescriptionKey: "语音文件上传功能尚未实现"])
         completion(.failure(notImplementedError))
+    }
+    
+    // 将文本转换为语音
+    func textToSpeech(text: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        // 验证API密钥
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            let error = NSError(domain: "com.mirrochild.openai", 
+                               code: 1, 
+                               userInfo: [NSLocalizedDescriptionKey: "OpenAI API密钥未设置"])
+            completion(.failure(error))
+            return
+        }
         
-        // 注释掉未使用的代码以避免警告
-        /*
+        // 创建请求URL
+        guard let url = URL(string: "https://api.openai.com/v1/audio/speech") else {
+            let error = NSError(domain: "com.mirrochild.openai", 
+                               code: 3, 
+                               userInfo: [NSLocalizedDescriptionKey: "无效的TTS API URL"])
+            completion(.failure(error))
+            return
+        }
+        
+        // 创建请求
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // 设置TTS参数
+        let parameters: [String: Any] = [
+            "model": "tts-1",
+            "voice": "alloy", // 可选: alloy, echo, fable, onyx, nova, shimmer
+            "input": text,
+            "response_format": "mp3",
+            "speed": 1.0 // 语速，范围0.25-4.0
+        ]
+        
+        // 序列化请求体
         do {
-            let audioData = try Data(contentsOf: fileURL)
+            request.httpBody = try JSONSerialization.data(withJSONObject: parameters)
+        } catch {
+            let serializationError = NSError(domain: "com.mirrochild.openai", 
+                                           code: 8, 
+                                           userInfo: [NSLocalizedDescriptionKey: "序列化TTS请求体失败: \(error.localizedDescription)"])
+            completion(.failure(serializationError))
+            return
+        }
+        
+        print("开始发送TTS请求...")
+        
+        // 发送请求并获取音频数据
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
             
-            // 检查文件大小
-            let fileSizeBytes = audioData.count
-            let fileSizeMB = Double(fileSizeBytes) / 1_048_576
-            print("准备上传的音频文件大小: \(fileSizeMB) MB")
-            
-            // OpenAI API限制为25MB
-            guard fileSizeMB < 25 else {
-                completion(.failure(OpenAIServiceError.fileTooLarge))
+            if let error = error {
+                let networkError = NSError(domain: "com.mirrochild.openai", 
+                                          code: 9, 
+                                          userInfo: [NSLocalizedDescriptionKey: "TTS网络请求错误: \(error.localizedDescription)"])
+                DispatchQueue.main.async {
+                    completion(.failure(networkError))
+                }
                 return
             }
-        } catch {
-            print("读取音频文件失败: \(error.localizedDescription)")
-            completion(.failure(error))
+            
+            guard let data = data else {
+                let noDataError = NSError(domain: "com.mirrochild.openai", 
+                                         code: 4, 
+                                         userInfo: [NSLocalizedDescriptionKey: "没有接收到TTS响应数据"])
+                DispatchQueue.main.async {
+                    completion(.failure(noDataError))
+                }
+                return
+            }
+            
+            // 收到音频数据，准备播放
+            print("收到TTS响应，音频数据大小: \(data.count)字节")
+            
+            // 播放音频
+            DispatchQueue.main.async {
+                self.playAudio(data: data, completion: completion)
+            }
         }
-        */
+        
+        task.resume()
     }
+    
+    // 播放音频数据
+    private func playAudio(data: Data, completion: @escaping (Result<Void, Error>) -> Void) {
+        do {
+            // 通知VoiceCaptureManager暂停录音
+            NotificationCenter.default.post(name: .willPlayTTS, object: nil)
+            
+            // 等待一小段时间让录音停止
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
+                
+                do {
+                    // 创建音频播放器
+                    self.audioPlayer = try AVAudioPlayer(data: data)
+                    
+                    // 设置音频会话，允许混音和播放
+                    let audioSession = AVAudioSession.sharedInstance()
+                    try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
+                    try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                    
+                    // 设置播放完成回调
+                    self.audioPlayer?.delegate = self
+                    self.audioPlayer?.volume = 1.0
+                    
+                    // 开始播放
+                    if self.audioPlayer?.play() == true {
+                        print("开始播放TTS音频")
+                        completion(.success(()))
+                    } else {
+                        let playError = NSError(domain: "com.mirrochild.openai", 
+                                              code: 10, 
+                                              userInfo: [NSLocalizedDescriptionKey: "无法播放TTS音频"])
+                        completion(.failure(playError))
+                    }
+                } catch {
+                    let audioError = NSError(domain: "com.mirrochild.openai", 
+                                           code: 11, 
+                                           userInfo: [NSLocalizedDescriptionKey: "音频播放初始化错误: \(error.localizedDescription)"])
+                    completion(.failure(audioError))
+                }
+            }
+        } catch {
+            let audioError = NSError(domain: "com.mirrochild.openai", 
+                                   code: 11, 
+                                   userInfo: [NSLocalizedDescriptionKey: "音频播放初始化错误: \(error.localizedDescription)"])
+            completion(.failure(audioError))
+        }
+    }
+}
+
+// 添加通知名称扩展
+extension Notification.Name {
+    static let didStartRecording = Notification.Name("didStartRecording")
+    static let didStopRecording = Notification.Name("didStopRecording")
+    static let willPlayTTS = Notification.Name("willPlayTTS") // 新增的通知
+}
+
+// 添加AVAudioPlayerDelegate扩展
+extension OpenAIService: AVAudioPlayerDelegate {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        print("TTS音频播放结束")
+        
+        // 清理资源
+        self.audioPlayer = nil
+        
+        // 恢复音频会话（如果需要）
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            // 通知录音可以恢复（如果需要）
+            NotificationCenter.default.post(name: .didFinishPlayingTTS, object: nil)
+        } catch {
+            print("重置音频会话时出错: \(error.localizedDescription)")
+        }
+    }
+}
+
+// 新增通知名称
+extension Notification.Name {
+    static let didFinishPlayingTTS = Notification.Name("didFinishPlayingTTS")
 } 
