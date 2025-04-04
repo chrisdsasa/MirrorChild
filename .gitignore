@@ -1,0 +1,69 @@
+# Xcode
+#
+# gitignore for Xcode projects
+# Specifically focusing on ignoring computer-specific and signing-related files
+
+## User settings and state
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+IDEWorkspaceChecks.plist
+WorkspaceSettings.xcsettings
+
+## macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+## Build generated
+build/
+DerivedData/
+*.o
+*.LinkFileList
+*.hmap
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+## Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+.swiftpm
+
+## CocoaPods
+Pods/
+Podfile.lock
+
+## Carthage
+Carthage/Build/
+
+## fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+## Code Injection
+iOSInjectionProject/
+
+## Signing and certificates
+*.cer
+*.p12
+*.mobileprovision
+*.provisionprofile
+*.xcframework/
+
+## Project specific settings - add to ensure signing details aren't shared
+project.pbxproj.mergesave
+xcuserdata/
+xcshareddata/xcschemes/
+*.xcodeproj/project.xcworkspace/xcshareddata/ 

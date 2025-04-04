@@ -7,6 +7,8 @@
 
 import SwiftUI
 import CoreData
+import Speech
+import AVFoundation
 
 @main
 struct MirrorChildApp: App {
@@ -30,6 +32,9 @@ struct MirrorChildApp: App {
         }
         
         checkFirstLaunch()
+        
+        // Set up permissions early
+        setupPermissions()
     }
 
     var body: some Scene {
@@ -41,7 +46,7 @@ struct MirrorChildApp: App {
                         // Request necessary permissions on first run
                         requestPermissions()
                     }
-                    .onChange(of: scenePhase) { newPhase in
+                    .onChange(of: scenePhase) { oldPhase, newPhase in
                         if newPhase == .active {
                             // App became active
                             print("App became active")
@@ -113,8 +118,26 @@ struct MirrorChildApp: App {
         }
     }
     
+    private func setupPermissions() {
+        // Setup background audio mode
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession.setActive(true)
+        } catch {
+            print("Failed to set audio session category: \(error)")
+        }
+    }
+    
     private func requestPermissions() {
-        // We're not using any permissions in the simplified app
+        // Pre-request permissions for better user experience
+        SFSpeechRecognizer.requestAuthorization { _ in }
+        
+        if #available(iOS 17.0, *) {
+            AVAudioApplication.requestRecordPermission { _ in }
+        } else {
+            AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+        }
     }
 }
 

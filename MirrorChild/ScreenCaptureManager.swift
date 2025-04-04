@@ -10,7 +10,7 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
     
     private let recorder = RPScreenRecorder.shared()
     private var isScreenRecordingAvailable: Bool {
-        return recorder.isAvailable
+        return isRunningInPreview ? true : recorder?.isAvailable ?? false
     }
     
     @Published var isRecording = false
@@ -77,11 +77,17 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
     
     // Call this to request permissions before trying to record
     func requestScreenCapturePermission(completion: @escaping (Bool) -> Void) {
-        // On iOS, we need to use RPScreenRecorder's APIs to request permissions
-        // This is the proper way to trigger the system permission dialog
+        // 在预览模式下总是返回授权成功
+        if isRunningInPreview {
+            self.permissionStatus = .authorized
+            DispatchQueue.main.async {
+                completion(true)
+            }
+            return
+        }
         
         // First check if recording is available on this device
-        guard isScreenRecordingAvailable else {
+        guard isScreenRecordingAvailable, let recorder = self.recorder else {
             self.permissionStatus = .denied
             completion(false)
             return
@@ -89,10 +95,10 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
         
         // This will trigger the system permission dialog
         // iOS will show a permission popup when we call this
-        RPScreenRecorder.shared().isMicrophoneEnabled = true
-        RPScreenRecorder.shared().startCapture { [weak self] (cmSampleBuffer, bufferType, error) in
+        recorder.isMicrophoneEnabled = true
+        recorder.startCapture { [weak self] (cmSampleBuffer, bufferType, error) in
             // Just immediately stop - we just want the permission dialog to show
-            RPScreenRecorder.shared().stopCapture { _ in
+            recorder.stopCapture { _ in
                 // Permission has been granted if we got here without error
                 self?.permissionStatus = .authorized
                 completion(true)
@@ -116,7 +122,15 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
     }
     
     func startCapture(completion: @escaping (Bool, Error?) -> Void) {
-        guard isScreenRecordingAvailable else {
+        // 在预览模式下模拟录屏成功
+        if isRunningInPreview {
+            isRecording = true
+            startGeneratingPreviewFrames()
+            completion(true, nil)
+            return
+        }
+        
+        guard isScreenRecordingAvailable, let recorder = self.recorder else {
             let error = NSError(domain: "com.mirrochild.screenrecording", 
                                code: 1,
                                userInfo: [NSLocalizedDescriptionKey: "Screen recording is not available on this device."])
@@ -210,6 +224,18 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
         // Update internal state first to avoid multiple stop attempts
         isCapturing = false
         isRecording = false
+        
+        // 在预览模式下直接重置状态
+        if isRunningInPreview {
+            isRecording = false
+            return
+        }
+        
+        // 确保recorder非空
+        guard let recorder = self.recorder else {
+            isRecording = false
+            return
+        }
         
         recorder.stopCapture { [weak self] error in
             DispatchQueue.main.async {

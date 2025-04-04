@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var isMicrophoneActive = false
     @State private var isScreenSharingActive = false
     @State private var showingScreenCapture = false
+    @State private var showingVoiceCapture = false
     @State private var showingBroadcastView = false
     
     // Constants
@@ -59,7 +60,7 @@ struct ContentView: View {
                 // Top bar with elegant, minimalist design
                 HStack {
                     Text("appTitle".localized)
-                        .font(.system(size: 22, weight: .light))
+                        .font(.system(size: 40, weight: .bold, design: .default))
                         .tracking(2)
                         .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                         .padding(.leading)
@@ -82,7 +83,7 @@ struct ContentView: View {
                     .accessibilityLabel("settingsButton".localized)
                     .padding(.trailing)
                 }
-                .padding(.top, 15)
+                .padding(.top, 25)
                 
                 Spacer()
                 
@@ -201,30 +202,17 @@ struct ContentView: View {
                         VStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(
-                                        isMicrophoneActive ? 
-                                        Color(red: 0.9, green: 0.5, blue: 0.5).opacity(0.2) :
-                                        Color(red: 0.95, green: 0.95, blue: 0.98)
-                                    )
+                                    .fill(Color(red: 0.95, green: 0.95, blue: 0.98))
                                     .frame(width: 80, height: 80)
                                     .overlay(
                                         Circle()
-                                            .stroke(
-                                                isMicrophoneActive ?
-                                                Color(red: 0.9, green: 0.5, blue: 0.5).opacity(0.4) :
-                                                Color(red: 0.6, green: 0.6, blue: 0.7).opacity(0.3),
-                                                lineWidth: 1.5
-                                            )
+                                            .stroke(Color(red: 0.6, green: 0.6, blue: 0.7).opacity(0.3), lineWidth: 1.5)
                                     )
                                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                                 
                                 Image(systemName: "mic.fill")
                                     .font(.system(size: 30, weight: .light))
-                                    .foregroundColor(
-                                        isMicrophoneActive ?
-                                        Color(red: 0.9, green: 0.4, blue: 0.4) :
-                                        Color(red: 0.5, green: 0.5, blue: 0.7)
-                                    )
+                                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                             }
                             
                             Text("voiceButtonLabel".localized)
@@ -241,30 +229,17 @@ struct ContentView: View {
                         VStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(
-                                        isScreenSharingActive ? 
-                                        Color(red: 0.5, green: 0.7, blue: 0.6).opacity(0.2) :
-                                        Color(red: 0.95, green: 0.95, blue: 0.98)
-                                    )
+                                    .fill(Color(red: 0.95, green: 0.95, blue: 0.98))
                                     .frame(width: 80, height: 80)
                                     .overlay(
                                         Circle()
-                                            .stroke(
-                                                isScreenSharingActive ?
-                                                Color(red: 0.5, green: 0.7, blue: 0.6).opacity(0.4) :
-                                                Color(red: 0.6, green: 0.6, blue: 0.7).opacity(0.3),
-                                                lineWidth: 1.5
-                                            )
+                                            .stroke(Color(red: 0.6, green: 0.6, blue: 0.7).opacity(0.3), lineWidth: 1.5)
                                     )
                                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                                 
                                 Image(systemName: "rectangle.on.rectangle")
                                     .font(.system(size: 26, weight: .light))
-                                    .foregroundColor(
-                                        isScreenSharingActive ?
-                                        Color(red: 0.4, green: 0.6, blue: 0.5) :
-                                        Color(red: 0.5, green: 0.5, blue: 0.7)
-                                    )
+                                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                             }
                             
                             Text("screenButtonLabel".localized)
@@ -288,16 +263,68 @@ struct ContentView: View {
                     isScreenSharingActive = BroadcastManager.shared.isBroadcasting
                 }
         }
+        .sheet(isPresented: $showingVoiceCapture) {
+            VoiceCaptureView()
+        }
     }
     
     // MARK: - User Actions
     
+    private var isRunningInPreview: Bool {
+        return ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    }
+    
     private func toggleMicrophone() {
-        isMicrophoneActive.toggle()
+        print("切换麦克风按钮被点击")
+        
+        // 强制更新UI状态
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isMicrophoneActive.toggle()
+        }
+        
         if isMicrophoneActive {
+            print("激活麦克风")
             messageText = "listeningMessage".localized
+            showingVoiceCapture = true
+            
+            // 在预览模式下简单切换状态，不尝试访问实际API
+            if isRunningInPreview {
+                print("预览模式：跳过实际录音")
+                return
+            }
+            
+            print("尝试启动录音...")
+            // 当激活麦克风时，实际启动录音
+            VoiceCaptureManager.shared.startRecording { success, error in
+                if success {
+                    print("录音成功启动")
+                    // 确保在主线程更新UI
+                    DispatchQueue.main.async {
+                        // 确保状态已更新
+                        self.isMicrophoneActive = true
+                    }
+                } else if let error = error {
+                    print("无法启动录音: \(error.localizedDescription)")
+                    // 失败时重置状态
+                    DispatchQueue.main.async {
+                        withAnimation {
+                            self.isMicrophoneActive = false
+                            self.showingVoiceCapture = false
+                            self.messageText = "voiceErrorMessage".localized
+                        }
+                    }
+                }
+            }
         } else {
+            print("停用麦克风")
             messageText = "voiceOffMessage".localized
+            showingVoiceCapture = false
+            
+            // 在预览模式下，跳过实际API调用
+            if !isRunningInPreview {
+                print("停止录音")
+                VoiceCaptureManager.shared.stopRecording()
+            }
         }
     }
     
@@ -315,7 +342,7 @@ struct JapaneseStyleSettingsView: View {
     @State private var showingVoiceProfilePage = false
     
     let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
-    
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -764,7 +791,10 @@ struct VoiceProfileView: View {
     }
 }
 
-#Preview {
-    ContentView()
-        .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        // 使用一个基本的环境包装ContentView，确保不会触发录音功能
+        ContentView()
+            .environment(\.isPreview, true)
+    }
 }
