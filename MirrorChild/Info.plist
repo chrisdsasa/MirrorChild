@@ -38,6 +38,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>MirrorChild需要访问本地网络以便可以与附近的设备进行连接</string>
+	<key>RPScreenRecordingUnsettingsWarning</key>
+	<string>MirrorChild需要屏幕录制权限以提供辅助功能</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiresFullScreen</key>
