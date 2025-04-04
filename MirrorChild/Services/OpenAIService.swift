@@ -5,9 +5,16 @@ import Combine
 class OpenAIService {
     static let shared = OpenAIService()
     
+    // 定义错误类型
+    enum OpenAIServiceError: Error {
+        case apiKeyMissing
+        case fileTooLarge
+        case invalidResponse
+    }
+    
     // OpenAI API Key - 实际使用中应该从更安全的地方获取
-    private var apiKey: String {
-        return UserDefaults.standard.string(forKey: "openai_api_key") ?? ""
+    private var apiKey: String? {
+        return UserDefaults.standard.string(forKey: "openai_api_key")
     }
     
     // API基础URL
@@ -18,7 +25,7 @@ class OpenAIService {
                                        transcribedText: String, 
                                        completion: @escaping (Result<String, Error>) -> Void) {
         // 验证API密钥
-        guard !apiKey.isEmpty else {
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
             let error = NSError(domain: "com.mirrochild.openai", 
                                code: 1, 
                                userInfo: [NSLocalizedDescriptionKey: "OpenAI API密钥未设置"])
@@ -53,7 +60,8 @@ class OpenAIService {
         
         for frame in selectedFrames {
             if let imageData = frame.image.jpegData(compressionQuality: 0.5) {
-                let base64String = imageData.base64EncodedString()
+                // 将图像转换为base64字符串(但在这里不需要存储它)
+                _ = imageData.base64EncodedString()
                 
                 // 创建带时间戳的帧描述
                 let formatter = DateFormatter()
@@ -130,7 +138,7 @@ class OpenAIService {
         // 创建请求
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("Bearer \(apiKey!)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
         // 构建系统指令
@@ -215,6 +223,42 @@ class OpenAIService {
     
     // 检查是否有API密钥
     func hasApiKey() -> Bool {
-        return !apiKey.isEmpty
+        return apiKey != nil && !apiKey!.isEmpty
+    }
+    
+    // 上传语音样本到OpenAI API
+    func uploadVoiceFile(fileURL: URL, completion: @escaping (Result<String, Error>) -> Void) {
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            completion(.failure(OpenAIServiceError.apiKeyMissing))
+            return
+        }
+        
+        // TODO: 实现实际的文件上传功能
+        // 目前这是一个占位方法，通知调用者功能尚未实现
+        let notImplementedError = NSError(domain: "com.mirrochild.openai", 
+                                         code: 7, 
+                                         userInfo: [NSLocalizedDescriptionKey: "语音文件上传功能尚未实现"])
+        completion(.failure(notImplementedError))
+        
+        // 注释掉未使用的代码以避免警告
+        /*
+        do {
+            let audioData = try Data(contentsOf: fileURL)
+            
+            // 检查文件大小
+            let fileSizeBytes = audioData.count
+            let fileSizeMB = Double(fileSizeBytes) / 1_048_576
+            print("准备上传的音频文件大小: \(fileSizeMB) MB")
+            
+            // OpenAI API限制为25MB
+            guard fileSizeMB < 25 else {
+                completion(.failure(OpenAIServiceError.fileTooLarge))
+                return
+            }
+        } catch {
+            print("读取音频文件失败: \(error.localizedDescription)")
+            completion(.failure(error))
+        }
+        */
     }
 } 

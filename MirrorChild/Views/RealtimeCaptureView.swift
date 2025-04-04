@@ -58,7 +58,7 @@ struct RealtimeCaptureView: View {
                         .frame(width: 10, height: 10)
                         .opacity(captureService.isCapturing ? 1.0 : 0.5)
                         .animation(captureService.isCapturing ? 
-                                  Animation.easeInOut(duration: 0.6).repeatForever(autoreverses: true) : .default, 
+                                  .easeInOut(duration: 0.6).repeatForever(autoreverses: true) : .default, 
                                   value: captureService.isCapturing)
                     
                     Text(captureService.isCapturing ? 
@@ -118,7 +118,7 @@ struct RealtimeCaptureView: View {
                             .foregroundColor(DesignSystem.Colors.textSecondary)
                         
                         Slider(value: $captureRate, in: 0.5...5.0, step: 0.5)
-                            .onChange(of: captureRate) { newValue in
+                            .onChange(of: captureRate) { oldValue, newValue in
                                 captureService.setCaptureRate(newValue)
                             }
                         
@@ -151,7 +151,7 @@ struct RealtimeCaptureView: View {
                                 .font(DesignSystem.Typography.caption)
                                 .foregroundColor(DesignSystem.Colors.textSecondary)
                         }
-                        .onChange(of: showText) { newValue in
+                        .onChange(of: showText) { oldValue, newValue in
                             captureService.setProcessingEnabled(newValue)
                         }
                         .toggleStyle(SwitchToggleStyle(tint: DesignSystem.Colors.accent))

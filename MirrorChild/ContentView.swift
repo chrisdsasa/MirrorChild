@@ -7,10 +7,14 @@
 
 import SwiftUI
 import CoreData
+import AVFoundation
+// 导入VoiceProfileView模块以获取通知支持
+import Combine
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var screenCaptureManager = ScreenCaptureManager.shared
+    @ObservedObject private var voiceCaptureManager = VoiceCaptureManager.shared
     
     // UI state
     @State private var showingSettings = false
@@ -312,6 +316,14 @@ struct ContentView: View {
         .sheet(isPresented: $showingSettings) {
             JapaneseStyleSettingsView()
                 .preferredColorScheme(.light)
+                .onDisappear {
+                    // 如果从设置页面返回，需要更新UI状态以匹配实际的录音状态
+                    if !VoiceCaptureManager.shared.isRecording {
+                        withAnimation {
+                            isMicrophoneActive = false
+                        }
+                    }
+                }
         }
         .sheet(isPresented: $showingBroadcastView) {
             BroadcastScreenView()
@@ -320,6 +332,53 @@ struct ContentView: View {
             VoiceCaptureView()
                 .preferredColorScheme(.light)
         }
+        // 监听VoiceCaptureManager的录音状态变化
+        .onChange(of: voiceCaptureManager.isRecording) { oldValue, newValue in 
+            print("VoiceCaptureManager.isRecording变化: \(oldValue) -> \(newValue)")
+            // 如果录音状态关闭，确保UI反映出来
+            if !newValue {
+                withAnimation {
+                    isMicrophoneActive = false
+                }
+                // 仅当之前状态是录音中时，才显示停止消息
+                if oldValue {
+                    messageText = "voiceOffMessage".localized
+                }
+            }
+        }
+        // 监听来自VoiceProfileView的录音状态变化
+        .listenToVoiceProfileRecording(onStart: {
+            // 当VoiceProfileView开始录音时，确保主界面不显示录音状态
+            print("收到VoiceProfileView开始录音通知")
+            DispatchQueue.main.async {
+                isMicrophoneActive = false
+                messageText = "configRecording".localized
+            }
+        }, onStop: {
+            // 当VoiceProfileView停止录音时，更新消息
+            print("收到VoiceProfileView停止录音通知")
+            DispatchQueue.main.async {
+                isMicrophoneActive = false
+                messageText = "voiceOffMessage".localized
+                
+                // 2秒后恢复默认消息
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    messageText = "initialGreeting".localized
+                }
+            }
+        }, onDismiss: {
+            // 当VoiceProfileView关闭时，确保主界面状态正确
+            print("收到VoiceProfileView页面关闭通知")
+            DispatchQueue.main.async {
+                isMicrophoneActive = false
+                messageText = "voiceOffMessage".localized
+                
+                // 强制重置isMicrophoneActive状态
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isMicrophoneActive = false
+                }
+            }
+        })
     }
     
     // MARK: - User Actions
@@ -331,53 +390,74 @@ struct ContentView: View {
     private func toggleMicrophone() {
         print("切换麦克风按钮被点击")
         
-        // 强制更新UI状态
-        withAnimation(.easeInOut(duration: 0.3)) {
-            isMicrophoneActive.toggle()
+        // 在预览模式下简单切换状态，不尝试访问实际API
+        if isRunningInPreview {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                isMicrophoneActive.toggle()
+            }
+            messageText = isMicrophoneActive ? "listeningMessage".localized : "voiceOffMessage".localized
+            print("预览模式：跳过实际录音")
+            return
         }
         
+        // 停止当前录音 或 开始新录音
         if isMicrophoneActive {
-            print("激活麦克风")
-            messageText = "listeningMessage".localized
-            showingVoiceCapture = true
-            
-            // 在预览模式下简单切换状态，不尝试访问实际API
-            if isRunningInPreview {
-                print("预览模式：跳过实际录音")
-                return
+            // 正在录音，需要停止
+            withAnimation(.easeInOut(duration: 0.3)) {
+                isMicrophoneActive = false
             }
-            
-            print("尝试启动录音...")
-            // 当激活麦克风时，实际启动录音
-            VoiceCaptureManager.shared.startRecording { success, error in
-                if success {
-                    print("录音成功启动")
-                    // 确保在主线程更新UI
-                    DispatchQueue.main.async {
-                        // 确保状态已更新
-                        self.isMicrophoneActive = true
-                    }
-                } else if let error = error {
-                    print("无法启动录音: \(error.localizedDescription)")
-                    // 失败时重置状态
-                    DispatchQueue.main.async {
-                        withAnimation {
-                            self.isMicrophoneActive = false
-                            self.showingVoiceCapture = false
-                            self.messageText = "voiceErrorMessage".localized
-                        }
-                    }
-                }
-            }
-        } else {
-            print("停用麦克风")
             messageText = "voiceOffMessage".localized
             showingVoiceCapture = false
             
-            // 在预览模式下，跳过实际API调用
-            if !isRunningInPreview {
-                print("停止录音")
-                VoiceCaptureManager.shared.stopRecording()
+            print("停止录音")
+            VoiceCaptureManager.shared.stopRecording()
+        } else {
+            // 未在录音，需要开始
+            // 先更新UI状态，给用户反馈
+            withAnimation(.easeInOut(duration: 0.3)) {
+                isMicrophoneActive = true
+            }
+            
+            // 更新消息文本
+            messageText = "listeningMessage".localized
+            
+            // 显示录音界面
+            showingVoiceCapture = true
+            
+            print("激活麦克风")
+            print("尝试启动录音...")
+            
+            // 在后台线程启动录音以避免UI卡顿
+            DispatchQueue.global(qos: .userInitiated).async {
+                // 尝试启动录音
+                VoiceCaptureManager.shared.startRecording { success, error in
+                    // 确保在主线程更新UI
+                    DispatchQueue.main.async {
+                        if success {
+                            print("录音成功启动")
+                        } else {
+                            // 启动失败，回滚UI状态
+                            withAnimation {
+                                self.isMicrophoneActive = false
+                                self.showingVoiceCapture = false
+                                
+                                // 显示错误消息
+                                if let error = error {
+                                    self.messageText = "无法启动录音: \(error.localizedDescription)"
+                                    print("无法启动录音: \(error.localizedDescription)")
+                                } else {
+                                    self.messageText = "voiceErrorMessage".localized
+                                    print("录音启动失败，无具体错误信息")
+                                }
+                            }
+                            
+                            // 2秒后恢复默认消息
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                self.messageText = "initialGreeting".localized
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -496,6 +576,10 @@ struct JapaneseStyleSettingsView: View {
                                     .padding(.leading, 10)
                                 
                                 Button(action: {
+                                    // 如果正在进行主界面的语音识别，先停止它
+                                    if voiceCaptureManager.isRecording {
+                                        voiceCaptureManager.stopRecording()
+                                    }
                                     showingVoiceProfilePage = true
                                 }) {
                                     HStack {
@@ -604,7 +688,10 @@ struct JapaneseStyleSettingsView: View {
                 }
             }
             .navigationBarHidden(true) // 隐藏原生导航栏
-            .sheet(isPresented: $showingVoiceProfilePage) {
+            .sheet(isPresented: $showingVoiceProfilePage, onDismiss: {
+                // 确保语音配置页面关闭时发送通知
+                VoiceProfileCoordinator.shared.notifyDismissed()
+            }) {
                 VoiceProfileView()
                     .preferredColorScheme(.light)
             }
@@ -618,20 +705,13 @@ struct JapaneseStyleSettingsView: View {
 
 struct VoiceProfileView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var isRecording = false
-    @State private var recordedSamples: [CGFloat] = []
-    @State private var uploadProgress: CGFloat = 0
-    @State private var isUploading = false
-    @State private var recordings: [Recording] = [
-        Recording(name: "Sample 1", duration: "0:12"),
-        Recording(name: "Sample 2", duration: "0:27")
-    ]
-    
-    struct Recording: Identifiable {
-        let id = UUID()
-        let name: String
-        let duration: String
-    }
+    @ObservedObject private var voiceCaptureManager = VoiceCaptureManager.shared
+    @State private var recordingName: String = ""
+    @State private var showingSaveDialog = false
+    @State private var isPlayingRecording: String? = nil
+    @State private var waveformHeights: [CGFloat] = Array(repeating: 0, count: 40)
+    @State private var waveformTimer: Timer? = nil
+    @State private var audioPlayer: AVAudioPlayer?
     
     var body: some View {
         NavigationView {
@@ -643,7 +723,11 @@ struct VoiceProfileView: View {
                     VStack(spacing: 25) {
                         instructionsView
                         recordingVisualizerView
-                        uploadButtonView
+                        
+                        // 在录音成功后显示上传按钮
+                        if let _ = voiceCaptureManager.voiceFileURL, !voiceCaptureManager.isRecording {
+                            saveRecordingButtonView
+                        }
                         
                         // Divider
                         Rectangle()
@@ -661,12 +745,68 @@ struct VoiceProfileView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
+                        // 在页面关闭前发送通知，确保主界面状态更新
+                        print("点击完成按钮")
+                        
+                        // 使用主线程更新UI，避免跨线程问题
+                        DispatchQueue.main.async {
+                            VoiceProfileCoordinator.shared.notifyDismissed()
+                            print("点击完成按钮发送页面关闭通知")
+                            
+                            // 如果正在录音，也发送停止录音通知
+                            if voiceCaptureManager.isRecording {
+                                VoiceProfileCoordinator.shared.notifyRecordingStopped()
+                                print("点击完成按钮发送停止录音通知")
+                            }
+                        }
+                        
                         dismiss()
                     }) {
                         Text("完成")
                             .font(.system(size: 17))
                             .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
                     }
+                }
+            }
+            .onAppear {
+                // 重新加载保存的录音列表
+                voiceCaptureManager.reloadSavedRecordings()
+                
+                // 启动波形动画
+                startWaveformAnimation()
+            }
+            .onDisappear {
+                // 停止波形动画
+                waveformTimer?.invalidate()
+                waveformTimer = nil
+                
+                // 停止任何正在播放的录音
+                audioPlayer?.stop()
+                audioPlayer = nil
+                
+                // 停止录音并重置音频会话
+                if voiceCaptureManager.isRecording {
+                    _ = voiceCaptureManager.stopVoiceFileRecording()
+                    
+                    // 确保在主线程上发送通知
+                    DispatchQueue.main.async {
+                        // 通知主界面录音已停止
+                        VoiceProfileCoordinator.shared.notifyRecordingStopped()
+                        print("在onDisappear中发送停止录音通知")
+                    }
+                }
+                
+                // 无论如何，都通知主界面语音配置页面已关闭
+                DispatchQueue.main.async {
+                    VoiceProfileCoordinator.shared.notifyDismissed()
+                    print("在onDisappear中发送页面关闭通知")
+                }
+                
+                // 重置音频会话
+                do {
+                    try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                } catch {
+                    print("离开页面时重置音频会话出错: \(error)")
                 }
             }
         }
@@ -676,7 +816,7 @@ struct VoiceProfileView: View {
     // MARK: - Subviews
     
     private var instructionsView: some View {
-        Text("voiceProfileInstructions".localized)
+        Text("录制您的声音样本，以便AI助手学习您的声音特征。录制内容将存储在您的设备上。")
             .font(.system(size: 18, weight: .regular))
             .tracking(0.5)
             .lineSpacing(5)
@@ -693,10 +833,78 @@ struct VoiceProfileView: View {
                 .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
                 .frame(height: 180)
             
-            if recordedSamples.isEmpty {
-                placeholderWaveformView
-            } else {
-                actualWaveformView
+            VStack {
+                if voiceCaptureManager.isRecording {
+                    // 录音状态下将波形图往上移动
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: 15) // 添加顶部间距
+                        
+                        // 显示录音时长
+                        Text(formatDuration(voiceCaptureManager.currentRecordingDuration))
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                        
+                        // 实时声波可视化 - 使用状态驱动的波形
+                        HStack(spacing: 3) {
+                            ForEach(0..<waveformHeights.count, id: \.self) { index in
+                                RoundedRectangle(cornerRadius: 1.5)
+                                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                                    .frame(width: 2, height: waveformHeights[index])
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: waveformHeights[index])
+                            }
+                        }
+                        .padding(.top, 7)
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 0)
+                } else if let _ = voiceCaptureManager.voiceFileURL {
+                    // 显示已录制但未保存的录音
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: 15) // 与录音时相同的顶部间距
+                        
+                        // 显示与录音时完全相同的结构
+                        Text("录音完成")
+                            .font(.system(size: 22, weight: .semibold)) // 与录音时的字体大小和粗细相同
+                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                        
+                        // 显示最后录制时的波形状态，与录音时布局完全一致
+                        HStack(spacing: 3) {
+                            ForEach(0..<waveformHeights.count, id: \.self) { index in
+                                RoundedRectangle(cornerRadius: 1.5)
+                                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                                    .frame(width: 2, height: waveformHeights[index])
+                            }
+                        }
+                        .padding(.top, 7)
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 0)
+                } else {
+                    // 麦克风准备好但未录音时显示静止的波形图
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: 15) // 与录音时相同的顶部间距
+                        
+                        // 状态文本占位，保持布局一致性
+                        Text("准备录音")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                        
+                        // 静止波形图
+                        HStack(spacing: 3) {
+                            ForEach(0..<40, id: \.self) { _ in
+                                RoundedRectangle(cornerRadius: 1.5)
+                                    .fill(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.3))
+                                    .frame(width: 2, height: CGFloat.random(in: 5...50))
+                            }
+                        }
+                        .padding(.top, 7) // 从原来的2增加到7，向下移动5像素
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 0)
+                }
             }
             
             recordButtonView
@@ -704,23 +912,30 @@ struct VoiceProfileView: View {
         .padding(.horizontal, 20)
     }
     
-    private var placeholderWaveformView: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<30, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.3))
-                    .frame(width: 3, height: CGFloat.random(in: 5...40))
+    private func startWaveformAnimation() {
+        // 初始化波形高度（如果尚未设置）
+        if waveformHeights.allSatisfy({ $0 == 0 }) {
+            // 使用更大的高度差异
+            waveformHeights = (0..<40).map { _ in CGFloat.random(in: 10...50) }
+        }
+        
+        // 创建计时器来更新波形
+        waveformTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+            // 在录音状态或播放状态才更新波形
+            if voiceCaptureManager.isRecording || self.isPlayingRecording != nil {
+                for i in 0..<self.waveformHeights.count {
+                    // 部分保留前值以获得更平滑的动画
+                    let previousHeight = self.waveformHeights[i]
+                    // 使用更大的波动范围（5-50）
+                    let randomHeight = CGFloat.random(in: 5...50)
+                    self.waveformHeights[i] = (previousHeight * 0.6) + (randomHeight * 0.4)
+                }
             }
         }
-    }
-    
-    private var actualWaveformView: some View {
-        HStack(spacing: 4) {
-            ForEach(recordedSamples.indices, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
-                    .frame(width: 3, height: recordedSamples[index])
-            }
+        
+        // 确保计时器在滚动时也能运行
+        if let timer = waveformTimer {
+            RunLoop.current.add(timer, forMode: .common)
         }
     }
     
@@ -729,116 +944,172 @@ struct VoiceProfileView: View {
             Spacer()
             
             recordButton
-                .padding(.bottom, 16)
+                .padding(.bottom, 25)
         }
     }
     
     private var recordButton: some View {
         Button(action: {
-            isRecording.toggle()
-            if isRecording {
-                startRecording()
+            if voiceCaptureManager.isRecording {
+                // 停止录音
+                _ = voiceCaptureManager.stopVoiceFileRecording()
+                // 确保无论录音是否成功停止，都更新UI状态
+                DispatchQueue.main.async {
+                    // 通知其他视图录音已停止
+                    VoiceProfileCoordinator.shared.notifyRecordingStopped()
+                    print("发送停止录音通知")
+                }
+            } else if voiceCaptureManager.voiceFileURL != nil {
+                // 重新录音
+                voiceCaptureManager.resetVoiceCloneStatus()
             } else {
-                stopRecording()
+                // 开始录音
+                voiceCaptureManager.startVoiceFileRecording()
+                // 通知其他视图录音已开始
+                VoiceProfileCoordinator.shared.notifyRecordingStarted()
+                print("发送开始录音通知")
             }
         }) {
-            Circle()
-                .fill(isRecording ? Color.red.opacity(0.8) : Color(red: 0.5, green: 0.5, blue: 0.8))
-                .frame(width: 56, height: 56)
-                .overlay(recordButtonOverlay)
-                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+            HStack {
+                if voiceCaptureManager.isRecording {
+                    // 停止录音按钮
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.trailing, 8)
+                    
+                    Text("停止录音")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
+                } else if voiceCaptureManager.voiceFileURL != nil {
+                    // 重新录音按钮
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.trailing, 8)
+                    
+                    Text("重新录音")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
+                } else {
+                    // 开始录音按钮
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.trailing, 8)
+                    
+                    Text("开始录音")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
+                }
+            }
+            .padding(.vertical, 14)
+            .padding(.horizontal, 30)
+            .background(
+                Capsule()
+                    .fill(voiceCaptureManager.isRecording ? 
+                         Color.red.opacity(0.8) : 
+                         Color(red: 0.5, green: 0.5, blue: 0.8))
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+            )
         }
     }
     
     @ViewBuilder
     private var recordButtonOverlay: some View {
-        if isRecording {
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.white)
-                .frame(width: 20, height: 20)
-        } else {
-            Circle()
-                .fill(Color.white)
-                .frame(width: 26, height: 26)
-        }
+        EmptyView() // 已不再使用
     }
     
-    private var uploadButtonView: some View {
-        VStack {
-            Button(action: {
-                uploadVoiceProfile()
-            }) {
-                HStack {
-                    Text("uploadVoiceProfile".localized)
-                        .font(.system(size: 17, weight: .medium))
-                        .tracking(1)
-                    
-                    if isUploading {
-                        Spacer()
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(0.8)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
-                        .opacity(recordedSamples.isEmpty ? 0.5 : 1)
-                )
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
+    private var saveRecordingButtonView: some View {
+        Button(action: {
+            saveRecording()
+        }) {
+            HStack {
+                Spacer()
+                Image(systemName: "square.and.arrow.down")
+                    .font(.system(size: 18))
+                    .padding(.trailing, 5)
+                Text("保存录音")
+                    .font(.system(size: 17, weight: .medium))
+                    .tracking(1)
+                Spacer()
             }
-            .disabled(recordedSamples.isEmpty || isUploading)
-            
-            if isUploading {
-                ProgressView(value: uploadProgress, total: 1.0)
-                    .accentColor(Color(red: 0.5, green: 0.5, blue: 0.8))
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 10)
-            }
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+            )
+            .foregroundColor(.white)
+            .padding(.horizontal, 20)
         }
     }
     
     private var savedRecordingsView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("savedRecordings".localized)
-                .font(.system(size: 18, weight: .medium))
-                .tracking(0.5)
-                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                .padding(.horizontal, 20)
+            HStack {
+                Text("已保存的录音")
+                    .font(.system(size: 18, weight: .medium))
+                    .tracking(0.5)
+                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                
+                Spacer()
+                
+                Text("\(voiceCaptureManager.savedRecordings.count) 个录音")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+            }
+            .padding(.horizontal, 20)
             
-            ForEach(recordings) { recording in
-                recordingRowView(for: recording)
+            if voiceCaptureManager.savedRecordings.isEmpty {
+                HStack {
+                    Spacer()
+                    Text("没有保存的录音")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                        .padding(.vertical, 30)
+                    Spacer()
+                }
+            } else {
+                ForEach(voiceCaptureManager.savedRecordings) { recording in
+                    recordingRowView(for: recording)
+                }
             }
         }
         .padding(.bottom, 20)
     }
     
-    private func recordingRowView(for recording: Recording) -> some View {
+    private func recordingRowView(for recording: SavedRecording) -> some View {
         HStack {
             Image(systemName: "waveform")
                 .font(.system(size: 18))
                 .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
             
-            Text(recording.name)
+            Text(recording.description)
                 .font(.system(size: 16, weight: .regular))
                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
             
             Spacer()
             
-            Text(recording.duration)
+            Text(formatDuration(recording.duration))
                 .font(.system(size: 14, weight: .light))
                 .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
             
             Button(action: {
-                // Play recording action
+                playOrStopRecording(recording)
             }) {
-                Image(systemName: "play.circle.fill")
+                Image(systemName: isPlayingRecording == recording.id ? "stop.circle.fill" : "play.circle.fill")
                     .font(.system(size: 22))
                     .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
             }
+            
+            Button(action: {
+                deleteRecording(recording)
+            }) {
+                Image(systemName: "trash")
+                    .font(.system(size: 18))
+                    .foregroundColor(Color.red.opacity(0.7))
+            }
+            .padding(.leading, 5)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
@@ -850,45 +1121,76 @@ struct VoiceProfileView: View {
         .padding(.horizontal, 20)
     }
     
-    // MARK: - Functions
+    // MARK: - Helper Functions
     
-    private func startRecording() {
-        // This would normally start actual audio recording
-        // For UI demo, we'll just generate random waveform data
-        recordedSamples = []
-        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            if isRecording {
-                if recordedSamples.count > 40 {
-                    recordedSamples.removeFirst()
-                }
-                recordedSamples.append(CGFloat.random(in: 5...70))
-            }
-        }
-        timer.fire()
+    private func saveRecording() {
+        // 自动生成年日月时分秒格式的文件名
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMddHHmmss"
+        let timestamp = dateFormatter.string(from: Date())
+        let autoName = "录音_\(timestamp)"
+        voiceCaptureManager.saveCurrentRecording(description: autoName)
+        // 保存后清空当前录音
+        voiceCaptureManager.resetVoiceCloneStatus()
     }
     
-    private func stopRecording() {
-        // Would normally stop recording and process audio
-    }
-    
-    private func uploadVoiceProfile() {
-        isUploading = true
-        uploadProgress = 0
-        
-        // Simulate upload progress
-        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-            if uploadProgress < 1.0 {
-                uploadProgress += 0.05
-            } else {
-                isUploading = false
-                timer.invalidate()
+    private func playOrStopRecording(_ recording: SavedRecording) {
+        if isPlayingRecording == recording.id {
+            // 停止播放
+            audioPlayer?.stop()
+            isPlayingRecording = nil
+        } else {
+            // 开始播放
+            isPlayingRecording = recording.id
+            
+            do {
+                // 配置音频会话为播放模式
+                try AVAudioSession.sharedInstance().setCategory(.playback)
+                try AVAudioSession.sharedInstance().setActive(true)
                 
-                // Add to recordings
-                let newRecording = Recording(name: "Recording \(recordings.count + 1)", duration: "0:18")
-                recordings.insert(newRecording, at: 0)
+                // 创建并保存播放器实例
+                audioPlayer = try AVAudioPlayer(contentsOf: recording.fileURL)
+                audioPlayer?.delegate = voiceCaptureManager
+                audioPlayer?.prepareToPlay()
+                
+                // 检查音量
+                audioPlayer?.volume = 1.0
+                
+                if audioPlayer?.play() == true {
+                    print("播放开始：\(recording.description)")
+                    // 播放完成后自动重置状态
+                    DispatchQueue.main.asyncAfter(deadline: .now() + recording.duration) {
+                        if self.isPlayingRecording == recording.id {
+                            self.isPlayingRecording = nil
+                        }
+                    }
+                } else {
+                    print("播放失败")
+                    isPlayingRecording = nil
+                }
+            } catch {
+                print("播放录音出错: \(error.localizedDescription)")
+                isPlayingRecording = nil
             }
         }
-        timer.fire()
+    }
+    
+    private func deleteRecording(_ recording: SavedRecording) {
+        // 如果正在播放这个录音，先停止播放
+        if isPlayingRecording == recording.id {
+            audioPlayer?.stop()
+            audioPlayer = nil
+            isPlayingRecording = nil
+        }
+        
+        // 从VoiceCaptureManager中删除录音
+        voiceCaptureManager.deleteRecording(id: recording.id)
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 

@@ -216,10 +216,17 @@ struct MirrorChildApp: App {
         SFSpeechRecognizer.requestAuthorization { _ in }
         
         if #available(iOS 17.0, *) {
-            AVAudioApplication.requestRecordPermission { _ in }
+            requestAudioPermission()
         } else {
             AVAudioSession.sharedInstance().requestRecordPermission { _ in }
         }
+    }
+    
+    @available(iOS 17.0, *)
+    private func requestAudioPermission() {
+        AVAudioApplication.requestRecordPermission(completionHandler: { (granted: Bool) in
+            // Permission result handled
+        })
     }
     
     private func debugPrintAvailableFonts() {
