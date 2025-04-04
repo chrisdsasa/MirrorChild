@@ -2,6 +2,10 @@ import SwiftUI
 import AVFoundation
 
 struct VoiceProfileRecordingView: View {
+    // 使用全局颜色常量
+    private let accentColor = Color.accentRebeccaPurple
+    private let surfaceColor = Color.surfaceThistle
+    
     @Environment(\.dismiss) private var dismiss
     
     // 录音状态
@@ -44,7 +48,7 @@ struct VoiceProfileRecordingView: View {
     var body: some View {
         ZStack {
             // 背景
-            Color(red: 0.97, green: 0.97, blue: 0.98)
+            surfaceColor.opacity(0.2)
                 .ignoresSafeArea()
             
             VStack(spacing: 30) {
@@ -52,7 +56,7 @@ struct VoiceProfileRecordingView: View {
                 Text("声音录制")
                     .font(.system(size: 32, weight: .medium))
                     .tracking(2)
-                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
+                    .foregroundColor(accentColor)
                     .padding(.top, 30)
                 
                 Spacer()
@@ -67,13 +71,13 @@ struct VoiceProfileRecordingView: View {
                     // 进度条
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(red: 0.9, green: 0.9, blue: 0.95))
+                            .fill(surfaceColor)
                             .frame(height: 8)
                         
                         RoundedRectangle(cornerRadius: 4)
                             .fill(isRecordingComplete ? 
                                   Color(red: 0.4, green: 0.7, blue: 0.5) : 
-                                  Color(red: 0.5, green: 0.5, blue: 0.8))
+                                  accentColor)
                             .frame(width: max(CGFloat(progressPercentage) * UIScreen.main.bounds.width - 40, 0), 
                                    height: 8)
                     }
@@ -81,7 +85,7 @@ struct VoiceProfileRecordingView: View {
                     // 时间文本
                     Text(String(format: "%.0f 秒", min(recordingTime, 30)))
                         .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                        .foregroundColor(accentColor.opacity(0.8))
                 }
                 .padding(.horizontal, 20)
                 
@@ -106,7 +110,7 @@ struct VoiceProfileRecordingView: View {
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
-                            .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.7))
+                            .foregroundColor(accentColor.opacity(0.7))
                             .padding(20)
                     }
                 }
@@ -143,7 +147,7 @@ struct VoiceProfileRecordingView: View {
                         VStack {
                             ZStack {
                                 Circle()
-                                    .fill(Color(red: 0.5, green: 0.7, blue: 0.5))
+                                    .fill(Color(red: 0.4, green: 0.7, blue: 0.5))
                                     .frame(width: 80, height: 80)
                                     .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
                                 
@@ -159,7 +163,7 @@ struct VoiceProfileRecordingView: View {
                         VStack {
                             ZStack {
                                 Circle()
-                                    .fill(Color(red: 0.7, green: 0.5, blue: 0.5))
+                                    .fill(accentColor.opacity(0.8))
                                     .frame(width: 80, height: 80)
                                     .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
                                 
@@ -175,7 +179,7 @@ struct VoiceProfileRecordingView: View {
                 Button(action: toggleRecording) {
                     ZStack {
                         Circle()
-                            .fill(isRecording ? Color(red: 0.8, green: 0.4, blue: 0.4) : Color(red: 0.5, green: 0.5, blue: 0.8))
+                            .fill(isRecording ? Color(red: 0.8, green: 0.4, blue: 0.4) : accentColor)
                             .frame(width: 100, height: 100)
                             .shadow(color: Color.black.opacity(0.15), radius: 5, x: 0, y: 3)
                         
@@ -195,7 +199,7 @@ struct VoiceProfileRecordingView: View {
                 Button(action: uploadRecording) {
                     ZStack {
                         Capsule()
-                            .fill(Color(red: 0.4, green: 0.6, blue: 0.8))
+                            .fill(accentColor)
                             .frame(height: 60)
                             .shadow(color: Color.black.opacity(0.15), radius: 5, x: 0, y: 3)
                         
@@ -224,7 +228,7 @@ struct VoiceProfileRecordingView: View {
                 VStack(spacing: 30) {
                     ForEach(0..<4) { _ in
                         Rectangle()
-                            .fill(Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.2))
+                            .fill(accentColor.opacity(0.1))
                             .frame(height: 1)
                     }
                 }
@@ -237,9 +241,9 @@ struct VoiceProfileRecordingView: View {
                             .fill(
                                 LinearGradient(
                                     gradient: Gradient(colors: [
-                                        Color(red: 0.4, green: 0.5, blue: 0.9),
-                                        Color(red: 0.5, green: 0.5, blue: 0.8),
-                                        Color(red: 0.6, green: 0.5, blue: 0.9)
+                                        accentColor.opacity(0.7),
+                                        accentColor,
+                                        accentColor.opacity(0.8)
                                     ]),
                                     startPoint: .bottom,
                                     endPoint: .top
@@ -250,7 +254,7 @@ struct VoiceProfileRecordingView: View {
                                 Animation.easeInOut(duration: 0.2),
                                 value: audioLevels[index]
                             )
-                            .shadow(color: Color.purple.opacity(0.1), radius: 3, x: 0, y: 0)
+                            .shadow(color: accentColor.opacity(0.2), radius: 3, x: 0, y: 0)
                     }
                 }
                 .frame(height: 120)
