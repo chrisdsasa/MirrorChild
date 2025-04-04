@@ -21,30 +21,73 @@ struct MirrorChildApp: App {
     @Environment(\.scenePhase) private var scenePhase
     
     init() {
-        // Configure app appearance
+        // 检查是否首次启动，如果是则显示引导页
+        let isFirstLaunch = !UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
+        _showOnboarding = State(initialValue: isFirstLaunch)
+        
+        // 首先进行基本的UI配置
         configureAppAppearance()
         
-        // Check if first launch
-        let isFirstLaunch = !UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
-        if isFirstLaunch {
-            // Set the onboarding flag to show onboarding screen
-            _showOnboarding = State(initialValue: true)
+        // 将耗时操作放在异步线程中执行，避免阻塞主线程
+        DispatchQueue.main.async {
+            // 初始化默认设置，确保应用有基本配置
+            UserDefaults.standard.set("shimmer", forKey: "selectedVoice")
+            UserDefaults.standard.set(0.7, forKey: "temperature")
+            
+            // 手动清理可能导致启动延迟的缓存
+            if let bundleID = Bundle.main.bundleIdentifier {
+                UserDefaults.standard.removePersistentDomain(forName: bundleID + ".SplashDefaults")
+            }
+            
+            // 创建默认用户资料（异步执行，不阻塞主线程）
+            _ = PersistenceController.shared.saveUserProfile(
+                name: "User",
+                email: "",
+                appleUserId: nil
+            )
         }
         
-        checkFirstLaunch()
-        
-        // Set up permissions early
+        // 简化启动流程
         setupPermissions()
     }
 
     var body: some Scene {
         WindowGroup {
+            // 处理模拟器特殊情况下，直接显示简单的视图确保能看到内容
+            #if targetEnvironment(simulator)
             ZStack {
+                // 简单的背景
+                Color(red: 0.95, green: 0.95, blue: 0.98)
+                    .ignoresSafeArea()
+                    .onAppear {
+                        print("模拟器视图已加载")
+                    }
+                
+                // 直接显示内容视图
+                ContentView()
+                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                
+                // 如果需要显示引导页，在最上层显示
+                if showOnboarding {
+                    SimpleOnboardingView(isPresented: $showOnboarding)
+                        .transition(.opacity)
+                        .zIndex(1) // 确保在最上层
+                }
+            }
+            #else
+            ZStack {
+                // 确保ContentView能立即显示
                 ContentView()
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
                     .onAppear {
-                        // Request necessary permissions on first run
-                        requestPermissions()
+                        // 应用已启动，可以执行非关键的操作
+                        print("Content view appeared")
+                        
+                        // 延迟请求权限，避免启动时就触发权限请求
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.requestPermissions()
+                            self.setupPermissions() 
+                        }
                     }
                     .onChange(of: scenePhase) { oldPhase, newPhase in
                         if newPhase == .active {
@@ -61,14 +104,12 @@ struct MirrorChildApp: App {
                 
                 // Overlay the onboarding view if needed
                 if showOnboarding {
-                    SimpleOnboardingView()
+                    SimpleOnboardingView(isPresented: $showOnboarding)
                         .transition(.opacity)
                         .zIndex(1) // Ensure it appears on top
-                        .onDisappear {
-                            showOnboarding = false
-                        }
                 }
             }
+            #endif
         }
     }
     
@@ -145,6 +186,7 @@ struct MirrorChildApp: App {
 struct SimpleOnboardingView: View {
     @State private var currentStep = 0
     @State private var userName = ""
+    @Binding var isPresented: Bool  // 使用Binding来控制显示状态
     
     var body: some View {
         ZStack {
@@ -159,6 +201,12 @@ struct SimpleOnboardingView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
+            .onAppear {
+                print("引导页面已显示")
+            }
+            .onDisappear {
+                print("引导页面已关闭")
+            }
             
             // Cherry blossom decorative elements
             GeometryReader { geometry in
@@ -300,38 +348,60 @@ struct SimpleOnboardingView: View {
                 
                 // Japanese-styled start button
                 Button(action: {
-                    // Dismiss onboarding
+                    // 设置已启动标志，避免下次再显示引导页
                     UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+                    // 直接设置绑定变量关闭引导页
+                    isPresented = false
+                    print("按钮被点击，引导页关闭")
                 }) {
-                    Text("startButton".localized)
-                        .font(.system(size: 20, weight: .medium))
-                        .tracking(4)
-                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                        .padding(.vertical, 16)
-                        .padding(.horizontal, 40)
-                        .background(
-                            RoundedRectangle(cornerRadius: 30)
-                                .stroke(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.5),
-                                            Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.5)
-                                        ]),
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                                .background(
-                                    RoundedRectangle(cornerRadius: 30)
-                                        .fill(Color.white.opacity(0.7))
-                                )
-                                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 3)
-                        )
+                    HStack {
+                        Text("startButton".localized)
+                            .font(.system(size: 20, weight: .medium))
+                            .tracking(4)
+                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                        
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                    }
+                    .padding(.vertical, 16)
+                    .padding(.horizontal, 40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 30)
+                            .stroke(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.5),
+                                        Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.5)
+                                    ]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                lineWidth: 1.5
+                            )
+                            .background(
+                                RoundedRectangle(cornerRadius: 30)
+                                    .fill(Color.white.opacity(0.9))
+                            )
+                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    )
                 }
+                .buttonStyle(ScaleButtonStyle())  // 添加自定义按钮样式
                 .padding(.bottom, 50)
+                .contentShape(Rectangle())  // 扩大点击区域
+                .allowsHitTesting(true)  // 确保按钮可点击
             }
             .padding()
         }
+    }
+}
+
+// 自定义按钮样式，提供轻触反馈
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(), value: configuration.isPressed)
     }
 }

@@ -17,6 +17,10 @@ extension LocalizedStringKey {
     static func from(_ key: String) -> LocalizedStringKey {
         return LocalizedStringKey(key)
     }
+    
+    var localized: LocalizedStringKey {
+        return self
+    }
 }
 
 // MARK: - Localization View Modifier

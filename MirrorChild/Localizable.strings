@@ -1,0 +1,66 @@
+/* Main screen */
+"appTitle" = "MirrorChild";
+"settingsButton" = "Settings";
+"selectPrompt" = "Please select";
+"voiceButtonLabel" = "Voice";
+"screenButtonLabel" = "Screen";
+"voiceButtonA11y" = "Voice Button";
+"voiceButtonA11yHint" = "Tap to activate voice assistance";
+"screenButtonA11y" = "Screen Button";
+"screenButtonA11yHint" = "Tap to activate screen assistance";
+
+/* Voice feedback messages */
+"initialGreeting" = "Hello! I'm here to assist you with your device.";
+"listeningMessage" = "Can you hear me? I'm listening to you now.";
+"voiceOffMessage" = "Voice assistance is off.";
+"screenOnMessage" = "I can see your screen now.";
+"screenOffMessage" = "Screen sharing is stopped.";
+
+/* Settings screen */
+"settingsTitle" = "Settings";
+"voiceTypeLabel" = "Voice Type";
+"voiceProfileLabel" = "Voice Profile";
+"customizeVoiceButton" = "Customize Your Voice";
+"assistantPersonalityLabel" = "Assistant Personality";
+"calmTrait" = "Calm";
+"kindTrait" = "Kind";
+"helpfulTrait" = "Helpful";
+"aboutAppLabel" = "About App";
+"versionInfo" = "MirrorChild Version 1.0.0";
+"doneButton" = "Done";
+
+/* Voice Profile screen */
+"voiceProfileTitle" = "Voice Profile";
+"voiceProfileInstructions" = "Record a sample of your voice or the voice you want to replicate. For best results, record at least 15 seconds of clear speech.";
+"uploadVoiceProfile" = "Upload Voice Sample";
+"savedRecordings" = "Saved Recordings";
+
+/* Screen Capture screen */
+"screenCaptureTitle" = "Screen Sharing";
+"screenCaptureActive" = "Screen Sharing Active";
+"screenCaptureInactive" = "Screen Sharing Inactive";
+"startCapture" = "Start Sharing";
+"stopCapture" = "Stop Sharing";
+"tapToStartCapture" = "Tap the button below to start sharing your screen";
+"permissionRequired" = "Permission Required";
+"screenPermissionRequired" = "MirrorChild needs your permission to view and share your screen to provide assistance.";
+"requestPermission" = "Grant Permission";
+"screenPermissionDenied" = "Screen recording permission was denied. Please enable it in your device settings to use this feature.";
+"permissionNeededMessage" = "Screen permission is needed before sharing";
+"permissionDeniedMessage" = "Screen recording permission is required. Please enable in Settings.";
+"openSettings" = "Open Settings";
+"openSettingsTitle" = "Enable Screen Recording";
+"openSettingsMessage" = "To enable screen recording, please go to Settings > Privacy > Screen Recording and enable permission for MirrorChild.";
+"openSettingsButton" = "Open Settings";
+"cleaningUpMessage" = "Preparing screen sharing... Please wait";
+"capturingScreen" = "Capturing screen content...";
+"tapToBroadcast" = "Tap the button below to start broadcasting your screen. Your screen will be shared even if you leave this app.";
+
+/* Onboarding screen */
+"welcome" = "Welcome";
+"digitalCompanion" = "Digital Companion";
+"appIntroTitle" = "About this app";
+"feature1" = "Support for smartphone operations";
+"feature2" = "Easily find needed features";
+"feature3" = "Help with daily tasks";
+"startButton" = "Let's begin"; 

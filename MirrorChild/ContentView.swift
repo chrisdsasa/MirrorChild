@@ -38,6 +38,10 @@ struct ContentView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
+            .onAppear {
+                // 确保主视图能立即显示
+                print("背景视图已加载")
+            }
             
             // Cherry blossom decorative elements (subtle)
             GeometryReader { geometry in
@@ -252,6 +256,15 @@ struct ContentView: View {
                     .accessibilityHint("screenButtonA11yHint".localized)
                 }
                 .padding(.bottom, 50)
+            }
+        }
+        .onAppear {
+            // 确保尽快进入主界面而不是停留在启动屏幕
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            
+            // 强制更新主线程UI
+            DispatchQueue.main.async {
+                isMessageAnimating = true
             }
         }
         .sheet(isPresented: $showingSettings) {

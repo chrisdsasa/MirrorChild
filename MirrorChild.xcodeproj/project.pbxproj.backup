@@ -46,21 +46,11 @@
 			);
 			target = 6AF94B0D2D9F5F300019B106 /* MirrorChildBroadcastSetupUI */;
 		};
-		A1C34E392D9F7C5800E29DFA /* Exceptions for "MirrorChild" folder in "MirrorChild" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 6A359A5C2D9EBB6700E8BAC4 /* MirrorChild */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		6A359A5F2D9EBB6700E8BAC4 /* MirrorChild */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				A1C34E392D9F7C5800E29DFA /* Exceptions for "MirrorChild" folder in "MirrorChild" target */,
-			);
 			path = MirrorChild;
 			sourceTree = "<group>";
 		};
@@ -448,7 +438,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"MirrorChild/Preview Content\"";
 				DEVELOPMENT_TEAM = 6NMN2A89PD;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MirrorChild/Info.plist;
 				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
 				INFOPLIST_KEY_CFBundleDisplayName = "";
@@ -489,7 +479,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"MirrorChild/Preview Content\"";
 				DEVELOPMENT_TEAM = 6NMN2A89PD;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MirrorChild/Info.plist;
 				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
 				INFOPLIST_KEY_CFBundleDisplayName = "";

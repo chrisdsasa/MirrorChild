@@ -2,11 +2,80 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIdentifier</key>
+	<string>name.KrypotoZ.MirrorChild</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>MirrorChild</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>ja</string>
+	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MirrorChild需要麦克风访问权限以听取您的声音并提供帮助</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>MirrorChild需要语音识别权限来理解您的语音命令，以便为您提供更好的辅助功能</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MirrorChild需要相机访问权限以协助解决设备问题</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MirrorChild需要照片库访问权限以保存和查看截图</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>MirrorChild需要屏幕录制权限以提供远程协助</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_mirrochild._tcp</string>
+		<string>_mirrochild._udp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>MirrorChild需要访问本地网络以便可以与附近的设备进行连接</string>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIRequiresFullScreen</key>
+	<false/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleIdentifier</key>
-			<string></string>
+			<string>name.KrypotoZ.MirrorChild</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 		</dict>
