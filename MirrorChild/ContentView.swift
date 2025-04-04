@@ -152,33 +152,33 @@ struct ContentView: View {
                     ZStack {
                         // Multiple shadow layers for ultra-bold effect
                         Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
+                            .font(.custom("PingFang SC", size: 40).weight(.black))
                             .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             .offset(x: 0.7, y: 0.7)
                         
                         Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
+                            .font(.custom("PingFang SC", size: 40).weight(.black))
                             .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             .offset(x: 0.7, y: 0)
                         
                         Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
+                            .font(.custom("PingFang SC", size: 40).weight(.black))
                             .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             .offset(x: 0, y: 0.7)
                             
                         Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
+                            .font(.custom("PingFang SC", size: 40).weight(.black))
                             .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             .offset(x: -0.7, y: 0)
                             
                         Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
+                            .font(.custom("PingFang SC", size: 40).weight(.black))
                             .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             .offset(x: 0, y: -0.7)
                             
                         // Main text (center)
                         Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
+                            .font(.custom("PingFang SC", size: 40).weight(.black))
                             .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                     }
                     .padding(.leading)
@@ -474,7 +474,6 @@ struct JapaneseStyleSettingsView: View {
     @State private var selectedVoice = "shimmer"
     @State private var selectedPersonalityTrait = "calmTrait".localized
     @State private var showingVoiceProfilePage = false
-    @State private var showingLanguageSelectionPage = false
     @ObservedObject private var voiceCaptureManager = VoiceCaptureManager.shared
     
     let personalityTraits = ["calmTrait".localized, "kindTrait".localized, "幽默"]
@@ -506,40 +505,6 @@ struct JapaneseStyleSettingsView: View {
                     // 内容区域
                     ScrollView {
                         VStack(spacing: 30) {
-                            // Voice language selection
-                            VStack(alignment: .leading, spacing: 15) {
-                                Text("voiceLanguageTitle".localized)
-                                    .font(.system(size: 20, weight: .bold))
-                                    .tracking(1)
-                                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                                    .padding(.leading, 10)
-                                
-                                Button(action: {
-                                    showingLanguageSelectionPage = true
-                                }) {
-                                    HStack {
-                                        Text(voiceCaptureManager.currentLanguage.localizedName)
-                                            .font(.system(size: 18, weight: .regular))
-                                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
-                                        
-                                        Spacer()
-                                        
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 20, weight: .semibold))
-                                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                                    }
-                                    .padding(15)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(Color.white)
-                                            .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                                    )
-                                }
-                                .padding(.horizontal, 10)
-                            }
-                            .padding(.vertical, 5)
-                            .padding(.horizontal, 15)
-                            
                             // Voice selection
                             VStack(alignment: .leading, spacing: 15) {
                                 Text("voiceTypeLabel".localized)
@@ -695,10 +660,6 @@ struct JapaneseStyleSettingsView: View {
                 VoiceProfileView()
                     .preferredColorScheme(.light)
             }
-            .sheet(isPresented: $showingLanguageSelectionPage) {
-                VoiceLanguageSelectionView()
-                    .preferredColorScheme(.light)
-            }
         }
     }
 }
@@ -816,7 +777,7 @@ struct VoiceProfileView: View {
     // MARK: - Subviews
     
     private var instructionsView: some View {
-        Text("录制您的声音样本，以便AI助手学习您的声音特征。录制内容将存储在您的设备上。")
+        Text("请在安静的环境中录制您的声音样本，以便AI助手学习您的声音特征。")
             .font(.system(size: 18, weight: .regular))
             .tracking(0.5)
             .lineSpacing(5)

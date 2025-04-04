@@ -11,8 +11,19 @@ import Speech
 import AVFoundation
 import UserNotifications
 
+// 添加方向控制类
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        // 限制应用只支持竖屏方向
+        return .portrait
+    }
+}
+
 @main
 struct MirrorChildApp: App {
+    // 注册AppDelegate
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
     let persistenceController = PersistenceController.shared
     
     // State for showing onboarding

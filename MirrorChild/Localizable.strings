@@ -1,5 +1,5 @@
 /* Main screen */
-"appTitle" = "MirrorChild";
+"appTitle" = "弥若亲伴";
 "settingsButton" = "设置";
 "selectPrompt" = "请选择";
 "voiceButtonLabel" = "语音";
@@ -29,7 +29,7 @@
 "kindTrait" = "友善";
 "helpfulTrait" = "乐于助人";
 "aboutAppLabel" = "关于应用";
-"versionInfo" = "MirrorChild 版本 1.0.0";
+"versionInfo" = "MirrorChild Version 1.0.0";
 "doneButton" = "完成";
 
 /* Voice Profile screen */
@@ -76,7 +76,7 @@
 
 /* Onboarding screen */
 "welcome" = "欢迎";
-"digitalCompanion" = "数字伴侣";
+"digitalCompanion" = "弥若亲伴 MirrorChild";
 "appIntroTitle" = "关于此应用";
 "feature1" = "智能手机操作支持";
 "feature2" = "轻松找到需要的功能";

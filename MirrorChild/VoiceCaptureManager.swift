@@ -21,23 +21,16 @@ extension EnvironmentValues {
 // 支持的语言枚举
 enum VoiceLanguage: String, CaseIterable, Identifiable {
     case chinese = "zh-CN"
-    case english = "en-US"
     
     var id: String { self.rawValue }
     
     // 语言的本地化显示名称
     var localizedName: String {
-        switch self {
-        case .english:
-            return "英语"
-        case .chinese:
-            return "中文"
-        }
+        return "中文"
     }
     
-    // 默认使用中文，其次是英文
+    // 默认使用中文
     static var deviceDefault: VoiceLanguage {
-        // 直接返回中文作为默认选项
         return .chinese
     }
 }
@@ -196,14 +189,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     }
     
     // 语言相关属性
-    @Published var currentLanguage: VoiceLanguage = .chinese {
-        didSet {
-            // 当语言改变时，更新语音识别器
-            updateSpeechRecognizer()
-            // 保存用户选择
-            UserDefaults.standard.set(currentLanguage.rawValue, forKey: "selectedVoiceLanguage")
-        }
-    }
+    @Published var currentLanguage: VoiceLanguage = .chinese
     
     // 语音类型相关
     @Published var selectedVoiceType: String = UserDefaults.standard.string(forKey: "selectedVoiceType") ?? "shimmer" {
@@ -214,7 +200,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     }
     
     // 获取所有可用的语音识别语言
-    @Published var availableLanguages: [VoiceLanguage] = []
+    @Published var availableLanguages: [VoiceLanguage] = [.chinese]
     
     private var cancellables = Set<AnyCancellable>()
     private var micPermissionGranted = false
@@ -241,13 +227,8 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         // 创建音频引擎
         audioEngine = AVAudioEngine()
         
-        // 从存储加载语言选择
-        if let savedLanguageCode = UserDefaults.standard.string(forKey: "selectedVoiceLanguage"),
-           let language = VoiceLanguage(rawValue: savedLanguageCode) {
-            currentLanguage = language
-        } else {
-            currentLanguage = .chinese
-        }
+        // 固定使用中文
+        currentLanguage = .chinese
         
         // 根据设备语言初始化语音识别器
         updateSpeechRecognizer()
@@ -336,63 +317,35 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         backgroundTask = .invalid
     }
     
-    // 更新语音识别器以匹配当前选择的语言
+    // 更新语音识别器
     private func updateSpeechRecognizer() {
-        guard !isRunningInPreview else { return }
-        
-        let locale = Locale(identifier: currentLanguage.rawValue)
+        // 使用中文语言识别器
+        let locale = Locale(identifier: "zh-CN")
         speechRecognizer = SFSpeechRecognizer(locale: locale)
+        speechRecognizer?.delegate = self
         
-        // 如果当前正在录音，需要重新启动录音以使用新的语音识别器
-        if isRecording {
-            stopRecording()
-            startRecording { success, error in
-                if !success {
-                    print("更改语言后重新启动录音失败: \(error?.localizedDescription ?? "未知错误")")
-                }
-            }
+        // 检查识别器是否可用
+        let isAvailable = speechRecognizer?.isAvailable ?? false
+        if !isAvailable {
+            print("中文语音识别器不可用")
+        } else {
+            print("中文语音识别器已准备就绪")
         }
     }
     
     // 检查设备上支持哪些语言
     private func checkAvailableLanguages() {
-        guard !isRunningInPreview else {
-            // 预览模式下假设所有语言都可用
-            self.availableLanguages = VoiceLanguage.allCases
-            return
-        }
+        // 只支持中文
+        self.availableLanguages = [.chinese]
         
-        var supported: [VoiceLanguage] = []
-        
-        for language in VoiceLanguage.allCases {
-            let locale = Locale(identifier: language.rawValue)
-            if SFSpeechRecognizer(locale: locale)?.isAvailable == true {
-                supported.append(language)
-            }
-        }
-        
-        // 如果没有可用的语言，至少添加英语作为备选
-        if supported.isEmpty {
-            supported.append(.english)
-        }
-        
-        // 更新可用语言列表
-        self.availableLanguages = supported
-        
-        // 如果当前选择的语言不在支持列表中，切换到第一个可用语言
-        if !supported.contains(currentLanguage) {
-            currentLanguage = supported.first ?? .english
-        }
+        // 确保当前语言设置为中文
+        currentLanguage = .chinese
     }
     
-    // 切换语言
+    // 切换语言函数保留但内部实现为空，以免其他地方调用出错
     func switchLanguage(to language: VoiceLanguage) {
-        guard availableLanguages.contains(language) else {
-            print("不支持的语言: \(language.localizedName)")
-            return
-        }
-        
-        currentLanguage = language
+        // 始终保持中文，不做任何切换
+        currentLanguage = .chinese
     }
     
     // 检查权限状态
@@ -636,12 +589,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             // 提供一些模拟的转录文本
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 // 根据当前选择的语言显示不同的模拟文本
-                switch self.currentLanguage {
-                case .english:
-                    self.transcribedText = "这是预览模式下的英语模拟录音文本。实际设备上会显示真实的语音转文字结果。"
-                case .chinese:
-                    self.transcribedText = "这是预览模式下的模拟录音文本。实际设备上会显示真实的语音转文字结果。"
-                }
+                self.transcribedText = "这是预览模式下的中文模拟录音文本。实际设备上会显示真实的语音转文字结果。"
                 completion(true, nil)
             }
             return
@@ -795,12 +743,6 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 if #available(iOS 16.0, *) {
                     recognitionRequest.addsPunctuation = true
                 }
-            }
-            
-            // 指定语言
-            // 如果可以使用当前选择的语言识别器，则使用它
-            if self.speechRecognizer?.locale.identifier != self.currentLanguage.rawValue {
-                self.updateSpeechRecognizer()
             }
             
             // 创建识别任务
@@ -1620,6 +1562,27 @@ extension VoiceCaptureManager: AVAudioPlayerDelegate {
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         if let error = error {
             print("音频播放解码错误: \(error.localizedDescription)")
+        }
+    }
+}
+
+// MARK: - SFSpeechRecognizerDelegate
+
+extension VoiceCaptureManager: SFSpeechRecognizerDelegate {
+    func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
+        if available {
+            print("语音识别器可用")
+        } else {
+            print("语音识别器不可用")
+            
+            // 如果正在录音，但识别器变得不可用，通知用户
+            if isRecording {
+                DispatchQueue.main.async {
+                    self.error = NSError(domain: "com.mirrochild.speechrecognition", 
+                                        code: 4, 
+                                        userInfo: [NSLocalizedDescriptionKey: "语音识别器不可用，请稍后再试。"])
+                }
+            }
         }
     }
 } 
