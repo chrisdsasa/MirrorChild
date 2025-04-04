@@ -69,6 +69,7 @@ struct BroadcastScreenView: View {
             }
             .padding()
         }
+        .preferredColorScheme(.light)
     }
     
     // MARK: - Subviews

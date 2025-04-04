@@ -144,6 +144,7 @@ struct ScreenCaptureView: View {
                 screenCaptureManager.stopCapture()
             }
         }
+        .preferredColorScheme(.light)
     }
     
     private var waitingForFramesView: some View {

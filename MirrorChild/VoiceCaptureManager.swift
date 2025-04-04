@@ -72,7 +72,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     @Published var transcribedText = ""
     @Published var error: Error?
     @Published var permissionStatus: PermissionStatus = .notDetermined
-    @Published var enablePunctuation = true // 控制是否启用标点符号功能
+    private var enablePunctuation = true // 控制是否启用标点符号功能
     
     // 语言相关属性
     @Published var currentLanguage: VoiceLanguage = .chinese {

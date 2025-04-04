@@ -75,6 +75,7 @@ struct VoiceLanguageSelectionView: View {
                 }
             }
         }
+        .preferredColorScheme(.light) // 强制使用浅色模式
     }
     
     // 为每种语言创建选择按钮

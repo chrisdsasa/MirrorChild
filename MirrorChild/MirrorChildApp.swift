@@ -50,6 +50,9 @@ struct MirrorChildApp: App {
         
         // 简化启动流程
         setupPermissions()
+        
+        // 打印可用字体列表，便于调试
+        debugPrintAvailableFonts()
     }
 
     var body: some Scene {
@@ -138,6 +141,32 @@ struct MirrorChildApp: App {
                 UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
             }
         }
+        
+        // 设置应用程序默认字体
+        setupDefaultFonts()
+    }
+    
+    // MARK: - Font Configuration
+    
+    private func setupDefaultFonts() {
+        // 设置默认字体为苹方和SF Pro
+        // 这会影响整个应用程序中未明确指定字体的文本
+        let fontDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .body)
+        
+        // 根据当前语言环境设置不同的默认字体
+        if Locale.current.language.languageCode?.identifier == "zh" {
+            // 中文环境使用苹方
+            UILabel.appearance().font = UIFont(name: "PingFangSC-Regular", size: fontDescriptor.pointSize)
+            UITextField.appearance().font = UIFont(name: "PingFangSC-Regular", size: fontDescriptor.pointSize)
+            UITextView.appearance().font = UIFont(name: "PingFangSC-Regular", size: fontDescriptor.pointSize)
+            UIButton.appearance().titleLabel?.font = UIFont(name: "PingFangSC-Regular", size: fontDescriptor.pointSize)
+        } else {
+            // 其他语言环境使用SF Pro
+            UILabel.appearance().font = UIFont(name: "SFProText-Regular", size: fontDescriptor.pointSize)
+            UITextField.appearance().font = UIFont(name: "SFProText-Regular", size: fontDescriptor.pointSize)
+            UITextView.appearance().font = UIFont(name: "SFProText-Regular", size: fontDescriptor.pointSize)
+            UIButton.appearance().titleLabel?.font = UIFont(name: "SFProText-Regular", size: fontDescriptor.pointSize)
+        }
     }
     
     private func checkFirstLaunch() {
@@ -191,6 +220,20 @@ struct MirrorChildApp: App {
         } else {
             AVAudioSession.sharedInstance().requestRecordPermission { _ in }
         }
+    }
+    
+    private func debugPrintAvailableFonts() {
+        // 只在DEBUG模式下输出字体列表，方便开发调试
+        #if DEBUG
+        print("=== 系统可用字体列表 ===")
+        for familyName in UIFont.familyNames.sorted() {
+            print("Font Family: \(familyName)")
+            for fontName in UIFont.fontNames(forFamilyName: familyName).sorted() {
+                print("-- Font: \(fontName)")
+            }
+        }
+        print("=== 字体列表结束 ===")
+        #endif
     }
 }
 
@@ -255,22 +298,26 @@ struct SimpleOnboardingView: View {
             
             VStack(spacing: 30) {
                 // Japanese-style welcome header
-                VStack(spacing: 12) {
-                    Text("welcome".localized)
-                        .font(.system(size: 36, weight: .light))
-                        .tracking(8)
-                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                    
-                    Text("appTitle".localized)
-                        .font(.system(size: 28, weight: .light))
-                        .tracking(2)
-                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
-                    
-                    Text("digitalCompanion".localized)
-                        .font(.system(size: 20, weight: .light))
-                        .tracking(4)
-                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
-                        .padding(.top, 5)
+                HStack {
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("welcome".localized)
+                            .font(.system(size: 42, weight: .bold))
+                            .tracking(8)
+                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                        
+                        Text("appTitle".localized)
+                            .font(.system(size: 38, weight: .heavy))
+                            .tracking(2)
+                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                        
+                        Text("digitalCompanion".localized)
+                            .font(.system(size: 30, weight: .regular))
+                            .tracking(4)
+                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                            .padding(.top, 5)
+                    }
+                    Spacer()
                 }
                 .padding(.top, 30)
                 
@@ -407,6 +454,7 @@ struct SimpleOnboardingView: View {
             }
             .padding()
         }
+        .preferredColorScheme(.light) // 强制使用浅色模式
     }
 }
 

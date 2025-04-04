@@ -47,7 +47,7 @@ struct VoiceCaptureView: View {
                 // Title with elegant, minimalist design
                 HStack {
                     Text("voiceProfileTitle".localized)
-                        .font(.system(size: 24, weight: .medium))
+                        .font(.appFont(size: 24, weight: .medium))
                         .tracking(1)
                         .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                     
@@ -57,7 +57,7 @@ struct VoiceCaptureView: View {
                         dismiss()
                     }) {
                         Text("doneButton".localized)
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.appFont(size: 16, weight: .medium))
                             .tracking(1)
                             .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                             .padding(.vertical, 8)
@@ -70,22 +70,6 @@ struct VoiceCaptureView: View {
                 }
                 .padding(.top, 20)
                 .padding(.horizontal)
-                
-                // 标点符号开关
-                Toggle(isOn: $voiceCaptureManager.enablePunctuation) {
-                    Text("自动添加标点符号")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
-                }
-                .padding(.horizontal, 25)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white)
-                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                )
-                .padding(.horizontal, 20)
-                .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.5, green: 0.5, blue: 0.8)))
                 
                 // Status indicator
                 HStack {
@@ -229,6 +213,7 @@ struct VoiceCaptureView: View {
                 secondaryButton: .cancel()
             )
         }
+        .preferredColorScheme(.light)
     }
     
     private var transcriptionView: some View {

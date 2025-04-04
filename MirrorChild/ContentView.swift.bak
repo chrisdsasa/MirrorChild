@@ -57,144 +57,32 @@ struct ContentView: View {
                         .font(.system(size: 24))
                         .foregroundColor(Color.pink.opacity(0.2))
                         .position(x: 30, y: geometry.size.height - 100)
-                    
-                    // Fixed position avatar in the center
-                    ZStack {
-                        // Animation indicators (positioned behind the main avatar)
-                        if isMicrophoneActive {
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.9, green: 0.5, blue: 0.5).opacity(0.3),
-                                            Color(red: 0.9, green: 0.6, blue: 0.7).opacity(0.3)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 2
-                                )
-                                .frame(width: avatarSize + 15, height: avatarSize + 15)
-                                .scaleEffect(isMicrophoneActive ? 1.05 : 1.0)
-                                .opacity(isMicrophoneActive ? 0.8 : 0)
-                                .animation(
-                                    Animation.easeInOut(duration: 1.5)
-                                        .repeatForever(autoreverses: true),
-                                    value: isMicrophoneActive
-                                )
-                        }
-                        
-                        if isScreenSharingActive {
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.5, green: 0.7, blue: 0.5).opacity(0.3),
-                                            Color(red: 0.6, green: 0.8, blue: 0.6).opacity(0.3)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 2
-                                )
-                                .frame(width: avatarSize + 15, height: avatarSize + 15)
-                                .scaleEffect(isScreenSharingActive ? 1.05 : 1.0)
-                                .opacity(isScreenSharingActive ? 0.8 : 0)
-                                .animation(
-                                    Animation.easeInOut(duration: 1.5)
-                                        .repeatForever(autoreverses: true),
-                                    value: isScreenSharingActive
-                                )
-                        }
-                        
-                        // Core avatar components (these stay fixed in position)
-                        ZStack {
-                            // Circular background with subtle border
-                            Circle()
-                                .fill(Color.white.opacity(0.9))
-                                .frame(width: avatarSize, height: avatarSize)
-                                .overlay(
-                                    Circle()
-                                        .stroke(
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [
-                                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.4),
-                                                    Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.4)
-                                                ]),
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            ),
-                                            lineWidth: 1.5
-                                        )
-                                )
-                                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
-                            
-                            // Stylized avatar image
-                            Image(systemName: "person.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                                .frame(width: avatarSize * 0.65, height: avatarSize * 0.65)
-                                .offset(y: -6)
-                        }
-                    }
-                    .position(x: geometry.size.width / 2, y: geometry.size.height * 0.32)
                 }
             }
             
             VStack(spacing: 25) {
                 // Top bar with elegant, minimalist design
                 HStack {
-                    ZStack {
-                        // Multiple shadow layers for ultra-bold effect
-                        Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                            .offset(x: 0.7, y: 0.7)
+                    Text("appTitle".localized)
+                        .font(.system(size: 22, weight: .semibold))
                         
-                        Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                            .offset(x: 0.7, y: 0)
-                        
-                        Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                            .offset(x: 0, y: 0.7)
-                            
-                        Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                            .offset(x: -0.7, y: 0)
-                            
-                        Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                            .offset(x: 0, y: -0.7)
-                            
-                        // Main text (center)
-                        Text("appTitle".localized)
-                            .font(.custom("SF Compact Display", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                    }
-                    .padding(.leading)
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                        .padding(.leading)
                     
                     Spacer()
                     
-                    Button {
-                        print("Settings button tapped")
+                    Button(action: {
                         showingSettings = true
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.6))
-                                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-                                .frame(width: 52, height: 52)
-                            
-                            Image(systemName: "gearshape.fill")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
-                        }
+                    }) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.6))
+                                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                            )
                     }
                     .accessibilityLabel("settingsButton".localized)
                     .padding(.trailing)
@@ -203,9 +91,84 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                // Empty space to account for the fixed position avatar
-                Color.clear
-                    .frame(width: 1, height: avatarSize + 30)
+                // Japanese-inspired avatar circle
+                ZStack {
+                    // Circular background with subtle border
+                    Circle()
+                        .fill(Color.white.opacity(0.9))
+                        .frame(width: avatarSize, height: avatarSize)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.4),
+                                            Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.4)
+                                        ]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+                    
+                    // Stylized avatar image
+                    Image(systemName: "person.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                        .frame(width: avatarSize * 0.45, height: avatarSize * 0.45)
+                    
+                    // Subtle animation for microphone active state
+                    if isMicrophoneActive {
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color(red: 0.9, green: 0.5, blue: 0.5).opacity(0.3),
+                                        Color(red: 0.9, green: 0.6, blue: 0.7).opacity(0.3)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                            .frame(width: avatarSize + 15, height: avatarSize + 15)
+                            .scaleEffect(isMicrophoneActive ? 1.05 : 1.0)
+                            .opacity(isMicrophoneActive ? 0.8 : 0)
+                            .animation(
+                                Animation.easeInOut(duration: 1.5)
+                                    .repeatForever(autoreverses: true),
+                                value: isMicrophoneActive
+                            )
+                    }
+                    
+                    // Screen sharing indicator
+                    if isScreenSharingActive {
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color(red: 0.5, green: 0.7, blue: 0.5).opacity(0.3),
+                                        Color(red: 0.6, green: 0.8, blue: 0.6).opacity(0.3)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                            .frame(width: avatarSize + 15, height: avatarSize + 15)
+                            .scaleEffect(isScreenSharingActive ? 1.05 : 1.0)
+                            .opacity(isScreenSharingActive ? 0.8 : 0)
+                            .animation(
+                                Animation.easeInOut(duration: 1.5)
+                                    .repeatForever(autoreverses: true),
+                                value: isScreenSharingActive
+                            )
+                    }
+                }
+                .padding(.bottom, 10)
                 
                 // Message text with Japanese-inspired paper card design
                 Text(messageText)
@@ -254,14 +217,14 @@ struct ContentView: View {
                                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                                 
                                 Image(systemName: "mic.fill")
-                                    .font(.system(size: 30, weight: .semibold))
+                                    .font(.system(size: 30, weight: .light))
                                     .foregroundColor(isMicrophoneActive ? 
                                                    Color(red: 0.4, green: 0.4, blue: 0.7) : 
                                                    Color(red: 0.5, green: 0.5, blue: 0.7))
                             }
                             
                             Text("voiceButtonLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 17, weight: .light))
                                 .tracking(1)
                                 .foregroundColor(isMicrophoneActive ? 
                                                Color(red: 0.4, green: 0.4, blue: 0.6) : 
@@ -286,15 +249,15 @@ struct ContentView: View {
                                     )
                                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                                 
-                                Image(systemName: "rectangle.on.rectangle.fill")
-                                    .font(.system(size: 26, weight: .semibold))
+                                Image(systemName: "rectangle.on.rectangle")
+                                    .font(.system(size: 26, weight: .light))
                                     .foregroundColor(isScreenSharingActive ? 
                                                   Color(red: 0.4, green: 0.6, blue: 0.4) : 
                                                   Color(red: 0.5, green: 0.5, blue: 0.7))
                             }
                             
                             Text("screenButtonLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 17, weight: .light))
                                 .tracking(1)
                                 .foregroundColor(isScreenSharingActive ? 
                                                Color(red: 0.3, green: 0.5, blue: 0.3) : 
@@ -409,7 +372,7 @@ struct JapaneseStyleSettingsView: View {
     @ObservedObject private var voiceCaptureManager = VoiceCaptureManager.shared
     
     let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
-    
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -421,7 +384,7 @@ struct JapaneseStyleSettingsView: View {
                         // Voice language selection
                         VStack(alignment: .leading, spacing: 15) {
                             Text("voiceLanguageTitle".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 18, weight: .medium))
                                 .tracking(1)
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                 .padding(.leading, 10)
@@ -431,14 +394,14 @@ struct JapaneseStyleSettingsView: View {
                             }) {
                                 HStack {
                                     Text(voiceCaptureManager.currentLanguage.localizedName)
-                                        .font(.system(size: 18, weight: .regular))
+                                        .font(.system(size: 16))
                                         .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
                                     
                                     Spacer()
                                     
                                     Image(systemName: "chevron.right")
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                                        .font(.system(size: 14))
+                                        .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
                                 }
                                 .padding(15)
                                 .background(
@@ -455,7 +418,7 @@ struct JapaneseStyleSettingsView: View {
                         // Voice selection
                         VStack(alignment: .leading, spacing: 15) {
                             Text("voiceTypeLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 18, weight: .medium))
                                 .tracking(1)
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                 .padding(.leading, 10)
@@ -463,7 +426,7 @@ struct JapaneseStyleSettingsView: View {
                             Picker("Voice Type", selection: $selectedVoice) {
                                 ForEach(availableVoices, id: \.self) { voice in
                                     Text(voice.capitalized)
-                                        .font(.system(size: 18, weight: .regular))
+                                        .font(.system(size: 18))
                                         .tag(voice)
                                 }
                             }
@@ -482,7 +445,7 @@ struct JapaneseStyleSettingsView: View {
                         // Voice Profile Section
                         VStack(alignment: .leading, spacing: 15) {
                             Text("voiceProfileLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 18, weight: .medium))
                                 .tracking(1)
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                 .padding(.leading, 10)
@@ -492,14 +455,14 @@ struct JapaneseStyleSettingsView: View {
                             }) {
                                 HStack {
                                     Text("customizeVoiceButton".localized)
-                                        .font(.system(size: 18, weight: .regular))
+                                        .font(.system(size: 18, weight: .light))
                                         .tracking(0.5)
                                         .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.6))
                                     
                                     Spacer()
                                     
                                     Image(systemName: "chevron.right")
-                                        .font(.system(size: 20, weight: .semibold))
+                                        .font(.system(size: 16, weight: .light))
                                         .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                                 }
                                 .padding(.vertical, 15)
@@ -518,7 +481,7 @@ struct JapaneseStyleSettingsView: View {
                         // Assistant traits
                         VStack(alignment: .leading, spacing: 15) {
                             Text("assistantPersonalityLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 18, weight: .medium))
                                 .tracking(1)
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                 .padding(.leading, 10)
@@ -527,11 +490,11 @@ struct JapaneseStyleSettingsView: View {
                                 ForEach(personalityTraits, id: \.self) { trait in
                                     HStack {
                                         Text(trait)
-                                            .font(.system(size: 18, weight: .regular))
+                                            .font(.system(size: 18, weight: .light))
                                             .tracking(0.5)
                                         Spacer()
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 20, weight: .semibold))
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 18, weight: .light))
                                             .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                                     }
                                     .padding(.vertical, 12)
@@ -557,14 +520,14 @@ struct JapaneseStyleSettingsView: View {
                         // About section
                         VStack(alignment: .leading, spacing: 15) {
                             Text("aboutAppLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 18, weight: .medium))
                                 .tracking(1)
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                 .padding(.leading, 10)
                             
                             HStack {
                                 Text("versionInfo".localized)
-                                    .font(.system(size: 18, weight: .regular))
+                                    .font(.system(size: 16, weight: .light))
                                     .tracking(0.5)
                                     .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
                                 Spacer()
@@ -584,14 +547,14 @@ struct JapaneseStyleSettingsView: View {
                 }
             }
             .navigationTitle("settingsTitle".localized)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
+                    Button(action: {
                         dismiss()
-                    } label: {
+                    }) {
                         Text("doneButton".localized)
-                            .font(.system(size: 18, weight: .regular))
+                            .font(.system(size: 16, weight: .medium))
                             .tracking(1)
                             .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                             .padding(.vertical, 8)
@@ -663,7 +626,7 @@ struct VoiceProfileView: View {
                         dismiss()
                     }) {
                         Text("doneButton".localized)
-                            .font(.system(size: 18, weight: .regular))
+                            .font(.system(size: 16, weight: .medium))
                             .tracking(1)
                             .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                             .padding(.vertical, 8)
@@ -683,7 +646,7 @@ struct VoiceProfileView: View {
     
     private var instructionsView: some View {
         Text("voiceProfileInstructions".localized)
-            .font(.system(size: 18, weight: .regular))
+            .font(.system(size: 17, weight: .light))
             .tracking(0.5)
             .lineSpacing(5)
             .multilineTextAlignment(.center)
