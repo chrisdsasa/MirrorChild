@@ -482,6 +482,7 @@ struct BroadcastScreenView: View {
                     // iOS 15之前需要将PCM数据转换为Data
                     let audioFormat = buffer!.format
                     let audioBuffer = buffer!
+                
                     
                     // 创建Data包装PCM数据
                     let channelCount = Int(audioFormat.channelCount)
