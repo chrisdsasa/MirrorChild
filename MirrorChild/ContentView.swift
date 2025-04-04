@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var isMicrophoneActive = false
     @State private var isScreenSharingActive = false
     @State private var showingScreenCapture = false
+    @State private var showingVoiceCapture = false
     @State private var showingBroadcastView = false
     
     // Constants
@@ -288,16 +289,57 @@ struct ContentView: View {
                     isScreenSharingActive = BroadcastManager.shared.isBroadcasting
                 }
         }
+        .sheet(isPresented: $showingVoiceCapture) {
+            VoiceCaptureView()
+        }
     }
     
     // MARK: - User Actions
     
+    private var isRunningInPreview: Bool {
+        return ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    }
+    
     private func toggleMicrophone() {
+        print("切换麦克风按钮被点击")
         isMicrophoneActive.toggle()
+        
         if isMicrophoneActive {
+            print("激活麦克风")
             messageText = "listeningMessage".localized
+            showingVoiceCapture = true
+            
+            // 在预览模式下简单切换状态，不尝试访问实际API
+            if isRunningInPreview {
+                print("预览模式：跳过实际录音")
+                return
+            }
+            
+            print("尝试启动录音...")
+            // 当激活麦克风时，实际启动录音
+            VoiceCaptureManager.shared.startRecording { success, error in
+                if success {
+                    print("录音成功启动")
+                } else if let error = error {
+                    print("无法启动录音: \(error.localizedDescription)")
+                    // 失败时重置状态
+                    DispatchQueue.main.async {
+                        self.isMicrophoneActive = false
+                        self.showingVoiceCapture = false
+                        self.messageText = "voiceErrorMessage".localized
+                    }
+                }
+            }
         } else {
+            print("停用麦克风")
             messageText = "voiceOffMessage".localized
+            showingVoiceCapture = false
+            
+            // 在预览模式下，跳过实际API调用
+            if !isRunningInPreview {
+                print("停止录音")
+                VoiceCaptureManager.shared.stopRecording()
+            }
         }
     }
     
@@ -315,7 +357,7 @@ struct JapaneseStyleSettingsView: View {
     @State private var showingVoiceProfilePage = false
     
     let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
-    
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -764,7 +806,10 @@ struct VoiceProfileView: View {
     }
 }
 
-#Preview {
-    ContentView()
-        .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        // 使用一个基本的环境包装ContentView，确保不会触发录音功能
+        ContentView()
+            .environment(\.isPreview, true)
+    }
 }
