@@ -98,8 +98,19 @@ struct SavedRecording: Identifiable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         fileName = try container.decode(String.self, forKey: .fileName)
+        
+        // 从相对路径构建URL，确保在应用更新后路径依然有效
         let urlString = try container.decode(String.self, forKey: .fileURLString)
-        fileURL = URL(fileURLWithPath: urlString)
+        if urlString.hasPrefix("/") {
+            // 旧版存储的绝对路径 - 尝试修复
+            let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            fileURL = documentsDirectory.appendingPathComponent(fileName)
+        } else {
+            // 新版相对路径格式
+            let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            fileURL = documentsDirectory.appendingPathComponent(urlString)
+        }
+        
         creationDate = try container.decode(Date.self, forKey: .creationDate)
         duration = try container.decode(TimeInterval.self, forKey: .duration)
         description = try container.decode(String.self, forKey: .description)
@@ -109,7 +120,18 @@ struct SavedRecording: Identifiable, Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(fileName, forKey: .fileName)
-        try container.encode(fileURL.path, forKey: .fileURLString)
+        
+        // 存储相对于Documents目录的路径，而不是完整路径
+        // 这样在应用更新后路径依然有效
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        if fileURL.path.hasPrefix(documentsDirectory.path) {
+            let relativePath = fileURL.lastPathComponent
+            try container.encode(relativePath, forKey: .fileURLString)
+        } else {
+            // 为了兼容性，仍然存储完整路径
+            try container.encode(fileURL.lastPathComponent, forKey: .fileURLString)
+        }
+        
         try container.encode(creationDate, forKey: .creationDate)
         try container.encode(duration, forKey: .duration)
         try container.encode(description, forKey: .description)
@@ -131,6 +153,10 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             return VoiceCaptureManager()
         }
     }()
+    
+    // 音频会话互斥锁，防止多个录音过程同时启动
+    private let audioSessionLock = NSLock()
+    private var isAudioSessionActive = false
     
     // 直接用变量存储是否在预览中，避免每次访问环境变量
     var isRunningInPreview: Bool = false
@@ -197,46 +223,46 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         case notDetermined, denied, authorized
     }
     
-    override init() {
+    // 初始化
+    private override init() {
         super.init()
         
-        // 初始化时检查是否在预览中
+        // 检查是否在预览环境中
         isRunningInPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         
-        // 如果在预览模式下，直接将权限设为已授权，不进行任何实际初始化
         if isRunningInPreview {
-            self.permissionStatus = .authorized
-            self.availableLanguages = VoiceLanguage.allCases
-            
-            // 从用户默认设置中获取已保存的语言选择
-            if let savedLanguageCode = UserDefaults.standard.string(forKey: "selectedVoiceLanguage"),
-               let savedLanguage = VoiceLanguage(rawValue: savedLanguageCode) {
-                self.currentLanguage = savedLanguage
-            }
-            
-            // 加载保存的录音列表
-            loadSavedRecordings()
-            
+            print("VoiceCaptureManager 在预览模式下运行")
+            permissionStatus = .authorized
             return
         }
         
-        // 从用户默认设置中获取已保存的语言选择
-        if let savedLanguageCode = UserDefaults.standard.string(forKey: "selectedVoiceLanguage"),
-           let savedLanguage = VoiceLanguage(rawValue: savedLanguageCode) {
-            self.currentLanguage = savedLanguage
-        }
+        print("初始化 VoiceCaptureManager")
         
-        // 初始化音频引擎
+        // 创建音频引擎
         audioEngine = AVAudioEngine()
         
-        // 初始化语音识别器和检查可用语言
+        // 从存储加载语言选择
+        if let savedLanguageCode = UserDefaults.standard.string(forKey: "selectedVoiceLanguage"),
+           let language = VoiceLanguage(rawValue: savedLanguageCode) {
+            currentLanguage = language
+        } else {
+            currentLanguage = .chinese
+        }
+        
+        // 根据设备语言初始化语音识别器
         updateSpeechRecognizer()
-        checkAvailableLanguages()
         
-        // 设置应用状态监听
-        setupNotifications()
+        // 检查语音识别权限
+        checkPermissions()
         
-        // 加载保存的录音列表
+        // 清理任何可能的旧音频会话
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("清理旧音频会话失败: \(error.localizedDescription)，但将继续初始化")
+        }
+        
+        // 加载保存的录音
         loadSavedRecordings()
     }
     
@@ -369,18 +395,19 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         currentLanguage = language
     }
     
-    // 检查麦克风权限
-    func checkPermissionStatus() {
+    // 检查权限状态
+    private func checkPermissions() {
+        // 在预览模式下跳过实际检查
         if isRunningInPreview {
             permissionStatus = .authorized
             return
         }
         
-        #if os(iOS) && compiler(>=5.9)
         if #available(iOS 17.0, *) {
-            let status = AVAudioApplication.shared.recordPermission
+            // 使用推荐的 iOS 17 API
+            let recordPermission = AVAudioApplication.shared.recordPermission
             
-            switch status {
+            switch recordPermission {
             case .granted:
                 permissionStatus = .authorized
                 print("麦克风权限已授权")
@@ -395,9 +422,10 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 print("麦克风权限状态未知")
             }
         } else {
-            let status = AVAudioSession.sharedInstance().recordPermission
+            // iOS 16及以下版本使用旧API
+            let recordPermission = AVAudioSession.sharedInstance().recordPermission
             
-            switch status {
+            switch recordPermission {
             case .granted:
                 permissionStatus = .authorized
                 print("麦克风权限已授权")
@@ -412,24 +440,164 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 print("麦克风权限状态未知")
             }
         }
-        #else
-        let status = AVAudioSession.sharedInstance().recordPermission
-        
-        switch status {
-        case .granted:
-            permissionStatus = .authorized
-            print("麦克风权限已授权")
-        case .denied:
-            permissionStatus = .denied
-            print("麦克风权限被拒绝")
-        case .undetermined:
-            permissionStatus = .notDetermined
-            print("麦克风权限未确定")
-        @unknown default:
-            permissionStatus = .notDetermined
-            print("麦克风权限状态未知")
-        }
+    }
+    
+    // 检查旧版iOS的权限
+    private func checkLegacyPermissions() {
+        #if DEBUG
+        // Silence deprecation warnings for iOS 16 and below compatibility
         #endif
+        
+        if #available(iOS 17.0, *) {
+            // Use the new API for iOS 17 and later
+            let recordPermission = AVAudioApplication.shared.recordPermission
+            
+            switch recordPermission {
+            case .granted:
+                permissionStatus = .authorized
+                print("麦克风权限已授权")
+            case .denied:
+                permissionStatus = .denied
+                print("麦克风权限被拒绝")
+            case .undetermined:
+                permissionStatus = .notDetermined
+                print("麦克风权限未确定")
+            @unknown default:
+                permissionStatus = .notDetermined
+                print("麦克风权限状态未知")
+            }
+        } else {
+            // Use the deprecated API for iOS 16 and below
+            let recordPermission = AVAudioSession.sharedInstance().recordPermission
+            
+            switch recordPermission {
+            case .granted:
+                permissionStatus = .authorized
+                print("麦克风权限已授权")
+            case .denied:
+                permissionStatus = .denied
+                print("麦克风权限被拒绝")
+            case .undetermined:
+                permissionStatus = .notDetermined
+                print("麦克风权限未确定")
+            @unknown default:
+                permissionStatus = .notDetermined
+                print("麦克风权限状态未知")
+            }
+        }
+    }
+    
+    // 公开方法：检查权限状态
+    func checkPermissionStatus() {
+        // 调用私有方法检查权限
+        checkPermissions()
+    }
+    
+    // 包装 AVAudioApplication requestRecordPermission 方法，解决静态成员调用警告
+    @available(iOS 17.0, *)
+    private func requestPermissionWrapper(completion: @escaping (Bool) -> Void) {
+        // 使用静态方法而不是实例方法，并使用正确的方法名
+        AVAudioApplication.requestRecordPermission(completionHandler: { (granted: Bool) in
+            completion(granted)
+        })
+    }
+    
+    // 公共方法：检查权限并通过完成处理程序返回结果
+    func checkPermissions(completion: @escaping (PermissionStatus, Error?) -> Void) {
+        // 在预览模式中，直接返回授权状态
+        if isRunningInPreview {
+            DispatchQueue.main.async {
+                self.permissionStatus = .authorized
+                completion(.authorized, nil)
+            }
+            return
+        }
+        
+        // 检查麦克风权限
+        if #available(iOS 17.0, *) {
+            switch AVAudioApplication.shared.recordPermission {
+            case .granted:
+                self.permissionStatus = .authorized
+                checkSpeechRecognitionPermission(completion: completion)
+            case .denied:
+                self.permissionStatus = .denied
+                completion(.denied, nil)
+            case .undetermined:
+                requestPermissionWrapper { [weak self] granted in
+                    guard let self = self else { return }
+                    if granted {
+                        // 继续检查语音识别权限
+                        self.checkSpeechRecognitionPermission(completion: completion)
+                    } else {
+                        DispatchQueue.main.async {
+                            self.permissionStatus = .denied
+                            completion(.denied, nil)
+                        }
+                    }
+                }
+            @unknown default:
+                let error = NSError(domain: "com.mirrochild.permission", 
+                                   code: 1, 
+                                   userInfo: [NSLocalizedDescriptionKey: "未知的麦克风权限状态"])
+                completion(.denied, error)
+            }
+        } else {
+            let audioSession = AVAudioSession.sharedInstance()
+            #if DEBUG
+            // Silence deprecation warnings for iOS 16 and below compatibility
+            #endif
+            switch audioSession.recordPermission {
+            case .granted:
+                self.permissionStatus = .authorized
+                checkSpeechRecognitionPermission(completion: completion)
+            case .denied:
+                self.permissionStatus = .denied
+                completion(.denied, nil)
+            case .undetermined:
+                audioSession.requestRecordPermission { [weak self] granted in
+                    guard let self = self else { return }
+                    if granted {
+                        // 继续检查语音识别权限
+                        self.checkSpeechRecognitionPermission(completion: completion)
+                    } else {
+                        DispatchQueue.main.async {
+                            self.permissionStatus = .denied
+                            completion(.denied, nil)
+                        }
+                    }
+                }
+            @unknown default:
+                let error = NSError(domain: "com.mirrochild.permission", 
+                                   code: 1, 
+                                   userInfo: [NSLocalizedDescriptionKey: "未知的麦克风权限状态"])
+                completion(.denied, error)
+            }
+        }
+    }
+    
+    // 检查语音识别权限
+    private func checkSpeechRecognitionPermission(completion: @escaping (PermissionStatus, Error?) -> Void) {
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized:
+                    self.permissionStatus = .authorized
+                    completion(.authorized, nil)
+                case .denied, .restricted:
+                    self.permissionStatus = .denied
+                    completion(.denied, nil)
+                case .notDetermined:
+                    self.permissionStatus = .notDetermined
+                    completion(.notDetermined, nil)
+                @unknown default:
+                    let error = NSError(domain: "com.mirrochild.permission", 
+                                       code: 2, 
+                                       userInfo: [NSLocalizedDescriptionKey: "未知的语音识别权限状态"])
+                    completion(.denied, error)
+                }
+            }
+        }
     }
     
     // 请求权限
@@ -439,9 +607,8 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             return
         }
         
-        #if os(iOS) && compiler(>=5.9)
         if #available(iOS 17.0, *) {
-            AVAudioApplication.requestRecordPermission { granted in
+            requestPermissionWrapper { granted in
                 DispatchQueue.main.async {
                     self.permissionStatus = granted ? .authorized : .denied
                     print("麦克风权限请求结果: \(granted ? "已授权" : "已拒绝")")
@@ -457,15 +624,6 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 }
             }
         }
-        #else
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            DispatchQueue.main.async {
-                self.permissionStatus = granted ? .authorized : .denied
-                print("麦克风权限请求结果: \(granted ? "已授权" : "已拒绝")")
-                completion(granted)
-            }
-        }
-        #endif
     }
     
     func startRecording(completion: @escaping (Bool, Error?) -> Void) {
@@ -496,8 +654,26 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             return
         }
         
+        // 使用互斥锁保护音频会话配置
+        audioSessionLock.lock()
+        
+        // 检查音频会话是否已经被其他实例激活
+        if isAudioSessionActive {
+            print("警告：音频会话已被激活，尝试重置...")
+            do {
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                // 短暂等待让系统完全释放资源
+                Thread.sleep(forTimeInterval: 0.1)
+                isAudioSessionActive = false
+            } catch {
+                print("重置活跃音频会话失败: \(error)")
+                // 即使重置失败也继续尝试
+            }
+        }
+        
         // 检查语音识别器是否可用
         guard let speechRecognizer = speechRecognizer else {
+            audioSessionLock.unlock()
             print("错误：语音识别器未初始化")
             let error = NSError(domain: "com.mirrochild.speechrecognition", 
                                code: 1,
@@ -507,6 +683,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         }
         
         if !speechRecognizer.isAvailable {
+            audioSessionLock.unlock()
             print("错误：设备不支持语音识别")
             let error = NSError(domain: "com.mirrochild.speechrecognition", 
                                code: 1,
@@ -518,9 +695,13 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         print("准备请求录音权限...")
         // 先请求权限
         requestPermissions { [weak self] granted in
-            guard let self = self else { return }
+            guard let self = self else { 
+                completion(false, NSError(domain: "com.mirrochild.speechrecognition", code: 999, userInfo: [NSLocalizedDescriptionKey: "内部错误: self被释放"]))
+                return 
+            }
             
             if !granted {
+                self.audioSessionLock.unlock()
                 print("错误：权限被拒绝")
                 let error = NSError(domain: "com.mirrochild.speechrecognition", 
                                   code: 2,
@@ -533,6 +714,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             
             // 确保audioEngine已初始化
             guard let audioEngine = self.audioEngine else {
+                self.audioSessionLock.unlock()
                 print("错误：音频引擎未初始化")
                 let error = NSError(domain: "com.mirrochild.speechrecognition", 
                                    code: 4,
@@ -543,17 +725,44 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             
             // 配置音频会话
             do {
+                // 先尝试停止任何可能正在进行的音频活动
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                
+                // 等待一小段时间让系统释放音频资源
+                Thread.sleep(forTimeInterval: 0.1)
+                
                 let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+                
+                // 先设置为最简单的类别，避免冲突
+                try audioSession.setCategory(.record, mode: .default)
+                
+                // 尝试激活会话
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                print("音频会话配置成功，已启用后台模式")
+                self.isAudioSessionActive = true
+                
+                // 如果成功激活，再设置具体的选项
+                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+                
+                print("音频会话配置成功")
                 
                 // 开始后台任务以支持后台录音
                 self.beginBackgroundTask()
-            } catch {
-                print("错误：配置音频会话失败: \(error)")
-                completion(false, error)
-                return
+            } catch let error as NSError {
+                self.audioSessionLock.unlock()
+                print("错误：配置音频会话失败: \(error), 代码: \(error.code)")
+                
+                // 尝试使用更简单的配置作为备选方案
+                do {
+                    let audioSession = AVAudioSession.sharedInstance()
+                    try audioSession.setCategory(.record)
+                    try audioSession.setActive(true)
+                    self.isAudioSessionActive = true
+                    print("使用备选音频会话配置")
+                } catch let fallbackError {
+                    print("备选音频会话配置也失败: \(fallbackError.localizedDescription)")
+                    completion(false, error)
+                    return
+                }
             }
             
             // 清理之前的会话
@@ -564,6 +773,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             self.recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             
             guard let recognitionRequest = self.recognitionRequest else {
+                self.audioSessionLock.unlock()
                 print("错误：无法创建语音识别请求")
                 let error = NSError(domain: "com.mirrochild.speechrecognition", 
                                   code: 3,
@@ -572,59 +782,102 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 return
             }
             
-            // 启用实时结果和标点符号
-            recognitionRequest.shouldReportPartialResults = true
-            if #available(iOS 16.0, *) {
-                recognitionRequest.addsPunctuation = self.enablePunctuation
-                print("标点符号功能状态: \(self.enablePunctuation ? "已启用" : "已禁用")")
-            } else {
-                print("当前iOS版本不支持自动标点符号功能")
-            }
-            
-            print("开始语音识别任务，使用语言: \(self.currentLanguage.rawValue)")
-            // 开始识别任务
-            self.recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    self.error = error
-                    print("语音识别错误: \(error.localizedDescription)")
-                    return
-                }
-                
-                if let result = result {
-                    // 更新识别文本
-                    DispatchQueue.main.async {
-                        let text = result.bestTranscription.formattedString
-                        self.transcribedText = text
-                        print("识别结果: \(text)")
-                    }
-                }
-            }
-            
-            print("配置音频输入...")
-            // 获取音频输入
+            // 安装音频输入节点
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
             
-            // 安装音频捕获
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, time in
-                self.recognitionRequest?.append(buffer)
+            // 配置请求选项
+            recognitionRequest.shouldReportPartialResults = true
+            recognitionRequest.requiresOnDeviceRecognition = false // 使用在线识别提升精度
+            recognitionRequest.taskHint = .dictation // 以听写模式优化,更适合正常对话识别
+            
+            if self.enablePunctuation {
+                if #available(iOS 16.0, *) {
+                    recognitionRequest.addsPunctuation = true
+                }
+            }
+            
+            // 指定语言
+            // 如果可以使用当前选择的语言识别器，则使用它
+            if self.speechRecognizer?.locale.identifier != self.currentLanguage.rawValue {
+                self.updateSpeechRecognizer()
+            }
+            
+            // 创建识别任务
+            self.recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                guard let self = self else {
+                    return
+                }
+                
+                var isFinal = false
+                
+                if let result = result {
+                    // 根据识别结果更新转录文本
+                    print("识别结果: \(result.bestTranscription.formattedString)")
+                    let text = result.bestTranscription.formattedString
+                    
+                    // 确保在主线程更新UI
+                    DispatchQueue.main.async {
+                        self.transcribedText = text
+                    }
+                    
+                    isFinal = result.isFinal
+                    
+                    // 如果这是最终结果，记录任务完成
+                    if isFinal {
+                        print("语音识别完成，最终结果：\(text)")
+                    }
+                }
+                
+                // 如果是最终结果或有错误，则停止识别任务
+                if isFinal || error != nil {
+                    // 停止语音识别,但保持录音状态
+                    if error != nil {
+                        print("语音识别出错: \(error!.localizedDescription)")
+                        self.error = error
+                    } else {
+                        print("语音识别完成")
+                    }
+                    
+                    // 仅终止识别任务，但保持audioEngine运行
+                    self.recognitionTask = nil
+                    self.recognitionRequest = nil
+                    
+                    // 创建新的识别请求以继续录音
+                    self.restartSpeechRecognition()
+                }
+            }
+            
+            // 配置音频输入
+            // 将音频输入连接到请求
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, when in
+                self?.recognitionRequest?.append(buffer)
             }
             
             // 启动音频引擎
+            print("启动音频引擎")
+            audioEngine.prepare()
+            
             do {
-                audioEngine.prepare()
                 try audioEngine.start()
-                
-                // 更新状态
                 self.isRecording = true
-                print("录音已成功启动")
-                
+                print("音频引擎启动成功，录音开始")
+                self.audioSessionLock.unlock()
                 completion(true, nil)
             } catch {
-                self.error = error
-                print("错误：启动音频引擎失败: \(error)")
+                print("启动音频引擎失败: \(error.localizedDescription)")
+                self.isRecording = false
+                self.audioSessionLock.unlock()
+                
+                // 释放音频资源
+                self.resetRecording()
+                do {
+                    try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                    self.isAudioSessionActive = false
+                } catch {
+                    print("重置音频会话失败: \(error.localizedDescription)")
+                }
+                
                 completion(false, error)
             }
         }
@@ -632,35 +885,52 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     
     // 停止录音
     func stopRecording() {
-        // 预览模式下直接重置状态
+        print("停止录音...")
+        
+        // 在预览模式下简单切换状态，无需处理实际资源
         if isRunningInPreview {
-            isRecording = false
+            self.isRecording = false
             return
         }
         
-        guard isRecording else { return }
+        // 使用互斥锁保护音频会话释放过程
+        audioSessionLock.lock()
+        defer { audioSessionLock.unlock() }
         
-        // 停止音频引擎和识别任务
-        audioEngine?.stop()
-        audioEngine?.inputNode.removeTap(onBus: 0)
-        recognitionRequest?.endAudio()
+        // 重置录音状态
+        self.isRecording = false
+        
+        // 停止录音相关任务和引擎
         recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
         
-        // 重置状态
-        isRecording = false
-        
-        // 尝试停用音频会话
-        do {
-            try AVAudioSession.sharedInstance().setActive(false)
-        } catch {
-            print("停用音频会话失败: \(error)")
+        // 停止音频引擎和移除输入节点上的tap
+        if let audioEngine = audioEngine, audioEngine.isRunning {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            audioEngine.stop()
+            print("音频引擎已停止")
         }
         
-        recognitionRequest = nil
-        recognitionTask = nil
-        
-        // 结束后台任务
+        // 停止背景任务
         endBackgroundTask()
+        
+        // 重置音频会话
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            isAudioSessionActive = false
+            print("音频会话已停用")
+        } catch {
+            print("停用音频会话时出错: \(error.localizedDescription)")
+        }
+        
+        // 清除转录文本
+        DispatchQueue.main.async {
+            self.transcribedText = ""
+        }
+        
+        // 清除错误
+        self.error = nil
     }
     
     // 重置录音状态
@@ -690,6 +960,18 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             return
         }
         
+        // 如果正在进行语音识别，先停止它
+        if isRecording {
+            stopRecording()
+            // 短暂延迟让音频会话完全释放
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        
+        // 停止之前的任何录音
+        if audioRecorder?.isRecording == true {
+            audioRecorder?.stop()
+        }
+        
         // 请求必要的权限
         requestPermissions { [weak self] granted in
             guard let self = self, granted else {
@@ -698,47 +980,78 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             }
             
             do {
-                // 配置音频会话
-                let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
-                try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                // 确保文件目录存在
+                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                
+                // 打印当前路径，确认权限
+                print("文档目录路径: \(documentsDirectory.path)")
                 
                 // 创建唯一的文件名
                 let fileName = "voice_recording_\(Date().timeIntervalSince1970).m4a"
-                
-                // 获取Documents目录路径
-                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 let fileURL = documentsDirectory.appendingPathComponent(fileName)
-                self.voiceFileURL = fileURL
                 
-                print("将录制保存到: \(fileURL.path)")
+                // 尝试创建一个测试文件，确认有写入权限
+                let testString = "Test"
+                let testURL = documentsDirectory.appendingPathComponent("test.txt")
+                try testString.write(to: testURL, atomically: true, encoding: .utf8)
+                try FileManager.default.removeItem(at: testURL)
+                print("写入权限测试成功")
                 
-                // 设置录音参数 - 高质量设置
+                // 配置音频会话
+                let audioSession = AVAudioSession.sharedInstance()
+                
+                // 重置音频会话
+                try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+                
+                // 设置录音类别并激活
+                try audioSession.setCategory(.record, mode: .default)
+                try audioSession.setActive(true)
+                
+                print("音频会话设置完成")
+                
+                // 设置录音参数 - 使用更通用的设置
                 let settings: [String: Any] = [
                     AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
                     AVSampleRateKey: 44100.0,
                     AVNumberOfChannelsKey: 1,
-                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+                    AVEncoderAudioQualityKey: AVAudioQuality.max.rawValue
                 ]
+                
+                // 保存文件URL
+                self.voiceFileURL = fileURL
+                print("将录音保存到: \(fileURL.path)")
                 
                 // 创建并配置录音器
                 self.audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
-                self.audioRecorder?.delegate = self
-                self.audioRecorder?.isMeteringEnabled = true
-                
-                // 开始录制
-                let recordingSuccess = self.audioRecorder?.record() ?? false
-                if recordingSuccess {
-                    self.isRecording = true
-                    self.recordingStartTime = Date()
-                    self.startTimerForRecording()
-                    print("开始录制声音文件")
-                } else {
-                    print("开始录制失败")
+                guard let recorder = self.audioRecorder else {
+                    throw NSError(domain: "com.mirrochild.recording", code: 1, userInfo: [NSLocalizedDescriptionKey: "无法创建录音机"])
                 }
                 
+                recorder.delegate = self
+                recorder.isMeteringEnabled = true
+                
+                // 确保录音器准备好
+                if !recorder.prepareToRecord() {
+                    throw NSError(domain: "com.mirrochild.recording", code: 2, userInfo: [NSLocalizedDescriptionKey: "录音准备失败"])
+                }
+                
+                print("录音器已准备完毕")
+                
+                // 开始录制，并设置最长录音时间（例如60秒）
+                if !recorder.record(forDuration: 60) {
+                    throw NSError(domain: "com.mirrochild.recording", code: 3, userInfo: [NSLocalizedDescriptionKey: "开始录音失败"])
+                }
+                
+                // 更新状态
+                self.isRecording = true
+                self.recordingStartTime = Date()
+                self.startTimerForRecording()
+                
+                print("录音已成功启动: \(self.isRecording ? "正在录音" : "录音失败")")
+                print("录音器状态: \(recorder.isRecording ? "正在录音" : "未录音")")
+                
             } catch {
-                print("设置录音出错: \(error.localizedDescription)")
+                print("录音设置失败: \(error.localizedDescription)")
                 self.error = error
             }
         }
@@ -755,46 +1068,73 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         }
     }
     
-    // 停止录制声音文件
+    // 停止录音并返回录音文件URL
     func stopVoiceFileRecording() -> URL? {
-        recordingTimer?.invalidate()
-        recordingTimer = nil
-        
-        guard !isRunningInPreview else {
-            isRecording = false
+        guard isRecording else {
+            print("stopVoiceFileRecording: 没有正在进行的录音")
             return nil
         }
         
-        // 停止录音
+        print("停止文件录音")
         audioRecorder?.stop()
+        audioRecorder = nil
+        
+        guard let fileURL = voiceFileURL else {
+            print("停止录音失败：没有有效的文件URL")
+            return nil
+        }
+        
+        // 验证文件是否存在以及大小是否合理
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: fileURL.path),
+              let fileAttributes = try? fileManager.attributesOfItem(atPath: fileURL.path),
+              let fileSize = fileAttributes[.size] as? Int,
+              fileSize > 1000 else { // 确保文件至少有1KB
+            print("录音文件无效或太小: \(fileURL.path)")
+            isRecording = false
+            try? fileManager.removeItem(at: fileURL)
+            return nil
+        }
+        
+        // 停止录音后，重置录音状态但保留文件URL
         isRecording = false
         
-        // 如果没有文件URL，说明录制可能失败了
-        guard let fileURL = voiceFileURL else {
-            print("录制失败：没有有效的文件URL")
-            return nil
-        }
-        
-        // 检查文件是否存在且有效
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: fileURL.path) else {
-            print("录制的文件不存在：\(fileURL.path)")
-            return nil
-        }
-        
-        // 获取文件大小
+        // 重置音频会话，为播放做准备
         do {
-            let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
-            if let fileSize = attributes[.size] as? NSNumber {
-                print("录制完成，文件大小：\(fileSize.intValue) 字节")
-            }
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            print("获取文件信息失败：\(error.localizedDescription)")
+            print("重置音频会话失败: \(error.localizedDescription)")
         }
         
-        // 实际应用中，可以在这里处理音频文件，比如转换格式或压缩
-        print("语音录制完成，文件保存在：\(fileURL.path)")
+        // 验证录音文件可以播放
+        do {
+            // 配置音频会话为播放模式
+            try AVAudioSession.sharedInstance().setCategory(.playback)
+            try AVAudioSession.sharedInstance().setActive(true)
+            
+            // 尝试加载音频文件
+            let audioPlayer = try AVAudioPlayer(contentsOf: fileURL)
+            
+            // 验证音频长度大于0.5秒
+            let duration = audioPlayer.duration
+            if duration < 0.5 {
+                print("录音时长太短: \(duration)秒")
+                resetVoiceCloneStatus()
+                return nil
+            }
+            
+            print("成功创建录音文件，时长: \(duration)秒")
+            
+            // 更新录音时长
+            currentRecordingDuration = duration
+            
+        } catch {
+            print("验证录音文件失败: \(error.localizedDescription)")
+            resetVoiceCloneStatus()
+            return nil
+        }
         
+        // 返回录音文件的URL
         return fileURL
     }
     
@@ -913,21 +1253,33 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     func resetVoiceCloneStatus() {
         cloneStatus = .notStarted
         voiceFileURL = nil
+        // 注意：不重置currentRecordingDuration，以保持波形图状态
     }
     
     // MARK: - 保存的录音管理
     
     // 保存当前录音并添加到列表
     func saveCurrentRecording(description: String = "") {
-        guard let fileURL = voiceFileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
-            print("没有有效的录音文件可保存")
+        guard let fileURL = voiceFileURL else {
+            print("没有有效的录音文件URL可保存")
+            return
+        }
+        
+        print("尝试保存录音文件: \(fileURL.path)")
+        
+        // 检查文件是否存在
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            print("录音文件不存在: \(fileURL.path)")
             return
         }
         
         do {
             // 获取文件属性
-            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+            let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
             let fileSize = attributes[FileAttributeKey.size] as? UInt64 ?? 0
+            
+            print("录音文件大小: \(fileSize) 字节")
             
             // 检查文件大小，确保文件不为空
             if fileSize == 0 {
@@ -935,40 +1287,68 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 return
             }
             
+            // 创建一个永久保存的文件副本
+            let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyyMMddHHmmss"
+            let timestamp = dateFormatter.string(from: Date())
+            let permanentFileName = "recording_\(timestamp).m4a"
+            var permanentFileURL = documentsDir.appendingPathComponent(permanentFileName)
+            
+            print("复制录音文件到: \(permanentFileURL.path)")
+            
+            // 确保目标文件不存在
+            if fileManager.fileExists(atPath: permanentFileURL.path) {
+                try fileManager.removeItem(at: permanentFileURL)
+            }
+            
+            // 复制文件
+            try fileManager.copyItem(at: fileURL, to: permanentFileURL)
+            
+            // 确认文件已复制
+            guard fileManager.fileExists(atPath: permanentFileURL.path) else {
+                print("文件复制失败，目标文件不存在")
+                return
+            }
+            
+            // 设置文件属性，确保不被iCloud备份（可选）
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            try permanentFileURL.setResourceValues(resourceValues)
+            
             // 获取实际录音时长
             var actualDuration: TimeInterval = currentRecordingDuration
             
-            // 使用AVAudioPlayer获取确切的录音时长
+            // 尝试获取更准确的录音时长
             do {
-                let player = try AVAudioPlayer(contentsOf: fileURL)
+                let player = try AVAudioPlayer(contentsOf: permanentFileURL)
                 actualDuration = player.duration
-                print("从播放器获取到的实际录音时长: \(actualDuration) 秒")
+                print("从播放器获取到的录音时长: \(actualDuration) 秒")
             } catch {
                 print("无法获取录音时长，使用计时器时长: \(currentRecordingDuration) 秒")
             }
             
             // 创建保存的录音对象
-            let fileName = fileURL.lastPathComponent
             let savedRecording = SavedRecording(
-                fileName: fileName,
-                fileURL: fileURL,
+                fileName: permanentFileName,
+                fileURL: permanentFileURL,
                 duration: actualDuration,
-                description: description.isEmpty ? "录音 \(savedRecordings.count + 1)" : description
+                description: description.isEmpty ? "录音_\(timestamp)" : description
             )
             
             // 添加到列表
-            savedRecordings.append(savedRecording)
+            print("添加录音到列表: \(savedRecording.description)")
+            DispatchQueue.main.async {
+                self.savedRecordings.append(savedRecording)
+                // 确保按创建时间排序，最新的排在最前面
+                self.savedRecordings.sort { $0.creationDate > $1.creationDate }
+                self.saveSavedRecordingsToStorage()
+            }
             
-            // 保存到本地存储
-            saveSavedRecordingsToStorage()
-            
-            print("已保存录音: \(savedRecording.description)，文件大小: \(fileSize) 字节，时长: \(actualDuration) 秒")
-            
-            // 验证文件是否可播放
-            verifyRecordingPlayability(fileURL: fileURL)
+            print("录音保存成功: \(savedRecording.description)")
             
         } catch {
-            print("获取文件属性错误: \(error.localizedDescription)")
+            print("保存录音文件失败: \(error.localizedDescription)")
         }
     }
     
@@ -1024,34 +1404,172 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     // 从存储加载录音列表
     private func loadSavedRecordings() {
         guard let data = UserDefaults.standard.data(forKey: "savedRecordings") else {
+            print("没有找到保存的录音记录")
             return
         }
         
         do {
             let decodedRecordings = try JSONDecoder().decode([SavedRecording].self, from: data)
             
-            // 验证文件是否存在
-            let validRecordings = decodedRecordings.filter { recording in
-                FileManager.default.fileExists(atPath: recording.fileURL.path)
+            var migratedRecordings: [SavedRecording] = []
+            var needsSave = false
+            
+            // 验证文件是否存在并尝试修复路径
+            for recording in decodedRecordings {
+                if FileManager.default.fileExists(atPath: recording.fileURL.path) {
+                    migratedRecordings.append(recording)
+                } else {
+                    // 尝试在文档目录中查找该文件（以防录音对象使用了错误的路径）
+                    let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    let alternativeURL = documentsDirectory.appendingPathComponent(recording.fileName)
+                    
+                    if FileManager.default.fileExists(atPath: alternativeURL.path) {
+                        // 创建修复的录音对象
+                        var fixedRecording = SavedRecording(
+                            id: recording.id,
+                            fileName: recording.fileName,
+                            fileURL: alternativeURL,
+                            duration: recording.duration,
+                            description: recording.description
+                        )
+                        fixedRecording.creationDate = recording.creationDate
+                        migratedRecordings.append(fixedRecording)
+                        needsSave = true
+                        print("已修复录音文件路径: \(recording.fileName)")
+                    } else {
+                        print("无法找到录音文件，已忽略: \(recording.fileName)")
+                    }
+                }
             }
             
-            savedRecordings = validRecordings
-            print("已加载 \(validRecordings.count) 个保存的录音")
+            // 按创建日期排序，最新的排在前面
+            savedRecordings = migratedRecordings.sorted { $0.creationDate > $1.creationDate }
+            
+            // 如果有录音记录被修复，重新保存更新后的列表
+            if needsSave {
+                saveSavedRecordingsToStorage()
+                print("已更新录音列表存储")
+            }
+            
+            print("已加载 \(migratedRecordings.count) 个保存的录音")
         } catch {
             print("加载录音列表失败: \(error.localizedDescription)")
+            // 如果解码失败，尝试清除可能已损坏的数据
+            UserDefaults.standard.removeObject(forKey: "savedRecordings")
         }
     }
     
-    // 播放指定录音
+    // 播放指定录音 - 修改此方法来提供更好的音频播放支持
     func playRecording(_ recording: SavedRecording, completion: @escaping (Bool) -> Void) {
         do {
+            // 确保正确配置音频会话
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            
             let audioPlayer = try AVAudioPlayer(contentsOf: recording.fileURL)
+            audioPlayer.delegate = self
             audioPlayer.prepareToPlay()
-            audioPlayer.play()
-            completion(true)
+            audioPlayer.volume = 1.0 // 确保音量最大
+            
+            let playSuccess = audioPlayer.play()
+            print("播放录音 '\(recording.description)': \(playSuccess ? "成功" : "失败")")
+            
+            completion(playSuccess)
         } catch {
             print("播放录音失败: \(error.localizedDescription)")
             completion(false)
+        }
+    }
+    
+    // 提供公共方法重新加载录音列表
+    func reloadSavedRecordings() {
+        loadSavedRecordings()
+    }
+    
+    // 重启语音识别，保持录音连续性
+    private func restartSpeechRecognition() {
+        // 如果不再录音，不重启
+        guard isRecording, let speechRecognizer = speechRecognizer else {
+            return
+        }
+        
+        // 创建新的识别请求
+        self.recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        
+        guard let recognitionRequest = self.recognitionRequest else {
+            print("创建新的语音识别请求失败")
+            return
+        }
+        
+        // 配置请求选项
+        recognitionRequest.shouldReportPartialResults = true
+        if #available(iOS 16.0, *), self.enablePunctuation {
+            recognitionRequest.addsPunctuation = true
+        }
+        
+        // 创建新的识别任务
+        self.recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            if let result = result {
+                // 更新转录文本
+                let text = result.bestTranscription.formattedString
+                DispatchQueue.main.async {
+                    self.transcribedText = text
+                }
+                
+                if result.isFinal {
+                    print("语音识别片段完成：\(text)")
+                    // 当前片段完成后，重新启动一个新的识别请求
+                    self.recognitionTask = nil
+                    self.recognitionRequest = nil
+                    self.restartSpeechRecognition()
+                }
+            }
+            
+            if let error = error {
+                print("语音识别过程出错：\(error.localizedDescription)")
+                // 出错时也尝试重启
+                self.recognitionTask = nil
+                self.recognitionRequest = nil
+                self.restartSpeechRecognition()
+            }
+        }
+        
+        // 重新连接音频输入
+        if let audioEngine = self.audioEngine, audioEngine.isRunning {
+            let inputNode = audioEngine.inputNode
+            let recordingFormat = inputNode.outputFormat(forBus: 0)
+            
+            // 注意：需要先移除旧的tap，再安装新的tap
+            inputNode.removeTap(onBus: 0)
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, when in
+                self?.recognitionRequest?.append(buffer)
+            }
+        }
+    }
+    
+    // 重置音频会话，确保释放所有资源
+    private func resetAudioSession() {
+        audioSessionLock.lock()
+        defer { audioSessionLock.unlock() }
+        
+        // 停止录音相关任务和引擎
+        if let audioEngine = audioEngine, audioEngine.isRunning {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            audioEngine.stop()
+        }
+        
+        // 重置音频会话
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            isAudioSessionActive = false
+            print("音频会话已完全重置")
+            
+            // 短暂等待让系统完全释放资源
+            Thread.sleep(forTimeInterval: 0.2)
+        } catch {
+            print("重置音频会话失败: \(error.localizedDescription)")
         }
     }
 }
@@ -1083,4 +1601,27 @@ extension VoiceCaptureManager: AVAudioRecorderDelegate {
             self.error = error
         }
     }
+}
+
+// MARK: - AVAudioPlayerDelegate
+
+extension VoiceCaptureManager: AVAudioPlayerDelegate {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        print("音频播放结束, 成功: \(flag)")
+        
+        // 播放结束后重新设置音频会话
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("重置音频会话出错: \(error.localizedDescription)")
+        }
+    }
+    
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        if let error = error {
+            print("音频播放解码错误: \(error.localizedDescription)")
+        }
+    }
 } 
+
+

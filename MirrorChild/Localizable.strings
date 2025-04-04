@@ -15,6 +15,9 @@
 "voiceOffMessage" = "语音助手已关闭。";
 "screenOnMessage" = "我现在可以看到您的屏幕。";
 "screenOffMessage" = "屏幕分享已停止。";
+"configRecording" = "正在录制语音样本，主界面语音助手已关闭。";
+"configRecordingSaved" = "语音样本已保存，配置成功。";
+"voiceErrorMessage" = "语音识别出现错误，请重试。";
 
 /* Settings screen */
 "settingsTitle" = "设置";
