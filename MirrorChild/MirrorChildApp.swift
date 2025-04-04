@@ -72,6 +72,7 @@ struct MirrorChildApp: App {
                     SimpleOnboardingView(isPresented: $showOnboarding)
                         .transition(.opacity)
                         .zIndex(1) // 确保在最上层
+                        .animation(.easeInOut(duration: 0.5), value: showOnboarding) // 添加淡入淡出动画
                 }
             }
             #else
@@ -107,6 +108,7 @@ struct MirrorChildApp: App {
                     SimpleOnboardingView(isPresented: $showOnboarding)
                         .transition(.opacity)
                         .zIndex(1) // Ensure it appears on top
+                        .animation(.easeInOut(duration: 0.5), value: showOnboarding) // 添加淡入淡出动画
                 }
             }
             #endif
@@ -350,8 +352,10 @@ struct SimpleOnboardingView: View {
                 Button(action: {
                     // 设置已启动标志，避免下次再显示引导页
                     UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
-                    // 直接设置绑定变量关闭引导页
-                    isPresented = false
+                    // 添加淡出动画效果
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        isPresented = false
+                    }
                     print("按钮被点击，引导页关闭")
                 }) {
                     HStack {
