@@ -310,14 +310,14 @@ struct SimpleOnboardingView: View {
                             .padding(.bottom, 25)
                         
                         Text("appTitle".localized)
-                            .font(.system(size: 38, weight: .heavy))
+                            .font(.system(size: 60, weight: .heavy))
                             .tracking(2)
                             .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
                             .padding(.bottom, 12)
                         
-                        Text("digitalCompanion".localized)
-                            .font(.system(size: 30, weight: .regular))
-                            .tracking(4)
+                        Text("MirrorChild")
+                            .font(.custom("SF Compact Display", size: 26, relativeTo: .title).weight(.bold))
+                            .tracking(1)
                             .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
                             .padding(.top, 5)
                     }
@@ -355,45 +355,47 @@ struct SimpleOnboardingView: View {
                         .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                         .frame(width: 70, height: 70)
                 }
+                .padding(.bottom, 10)
+                .padding(.top, -30)
                 
                 // Japanese-styled info card
                 VStack(spacing: 18) {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 14) {
                         // Feature item
                         HStack(spacing: 15) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
-                                .font(.system(size: 22, weight: .light))
+                                .font(.system(size: 24, weight: .light))
                             Text("feature1".localized)
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
                         }
-                        .padding(.leading, 30)
+                        .padding(.leading, 18)
                         
                         // Feature item
                         HStack(spacing: 15) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
-                                .font(.system(size: 22, weight: .light))
+                                .font(.system(size: 24, weight: .light))
                             Text("feature2".localized)
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
                         }
-                        .padding(.leading, 30)
+                        .padding(.leading, 18)
                         
                         // Feature item
                         HStack(spacing: 15) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
-                                .font(.system(size: 22, weight: .light))
+                                .font(.system(size: 24, weight: .light))
                             Text("feature3".localized)
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
                         }
-                        .padding(.leading, 30)
+                        .padding(.leading, 18)
                     }
                     .padding(.horizontal, 8)
                 }
@@ -404,7 +406,7 @@ struct SimpleOnboardingView: View {
                         .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                 )
                 .padding(.horizontal, 25)
-                .padding(.top, 5)
+                .padding(.top, -25)
                 
                 Spacer()
                     .frame(height: 5)
