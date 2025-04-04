@@ -376,6 +376,43 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             return
         }
         
+        #if os(iOS) && compiler(>=5.9)
+        if #available(iOS 17.0, *) {
+            let status = AVAudioApplication.shared.recordPermission
+            
+            switch status {
+            case .granted:
+                permissionStatus = .authorized
+                print("麦克风权限已授权")
+            case .denied:
+                permissionStatus = .denied
+                print("麦克风权限被拒绝")
+            case .undetermined:
+                permissionStatus = .notDetermined
+                print("麦克风权限未确定")
+            @unknown default:
+                permissionStatus = .notDetermined
+                print("麦克风权限状态未知")
+            }
+        } else {
+            let status = AVAudioSession.sharedInstance().recordPermission
+            
+            switch status {
+            case .granted:
+                permissionStatus = .authorized
+                print("麦克风权限已授权")
+            case .denied:
+                permissionStatus = .denied
+                print("麦克风权限被拒绝")
+            case .undetermined:
+                permissionStatus = .notDetermined
+                print("麦克风权限未确定")
+            @unknown default:
+                permissionStatus = .notDetermined
+                print("麦克风权限状态未知")
+            }
+        }
+        #else
         let status = AVAudioSession.sharedInstance().recordPermission
         
         switch status {
@@ -392,6 +429,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             permissionStatus = .notDetermined
             print("麦克风权限状态未知")
         }
+        #endif
     }
     
     // 请求权限
@@ -401,6 +439,25 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             return
         }
         
+        #if os(iOS) && compiler(>=5.9)
+        if #available(iOS 17.0, *) {
+            AVAudioApplication.requestRecordPermission { granted in
+                DispatchQueue.main.async {
+                    self.permissionStatus = granted ? .authorized : .denied
+                    print("麦克风权限请求结果: \(granted ? "已授权" : "已拒绝")")
+                    completion(granted)
+                }
+            }
+        } else {
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                DispatchQueue.main.async {
+                    self.permissionStatus = granted ? .authorized : .denied
+                    print("麦克风权限请求结果: \(granted ? "已授权" : "已拒绝")")
+                    completion(granted)
+                }
+            }
+        }
+        #else
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             DispatchQueue.main.async {
                 self.permissionStatus = granted ? .authorized : .denied
@@ -408,6 +465,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 completion(granted)
             }
         }
+        #endif
     }
     
     func startRecording(completion: @escaping (Bool, Error?) -> Void) {

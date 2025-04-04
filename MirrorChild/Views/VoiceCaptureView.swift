@@ -6,6 +6,7 @@ struct VoiceCaptureView: View {
     @State private var showingPermissionAlert = false
     @State private var alertMessage = ""
     @State private var showingSettingsAlert = false
+    @State private var isBlinking = false
     @Environment(\.dismiss) private var dismiss
     
     // Check if running in preview mode
@@ -60,8 +61,9 @@ struct VoiceCaptureView: View {
                 HStack {
                     Circle()
                         .fill(voiceCaptureManager.isRecording ? 
-                              Color(red: 0.4, green: 0.6, blue: 0.5) : Color(red: 0.8, green: 0.4, blue: 0.4))
+                              Color(red: 0.2, green: 0.8, blue: 0.2) : Color(red: 0.8, green: 0.4, blue: 0.4))
                         .frame(width: 12, height: 12)
+                        .opacity(voiceCaptureManager.isRecording ? (isBlinking ? 1.0 : 0.5) : 1.0)
                     
                     Text(voiceCaptureManager.isRecording ? 
                          "listeningMessage".localized : "voiceOffMessage".localized)
@@ -147,6 +149,23 @@ struct VoiceCaptureView: View {
                 Spacer()
             }
             .padding()
+        }
+        .onAppear {
+            // 创建定时器，每秒切换一次闪烁状态
+            let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    isBlinking.toggle()
+                }
+            }
+            // 将timer存储到RunLoop中，确保即使在滚动时也能继续工作
+            RunLoop.current.add(timer, forMode: .common)
+            // 保存timer引用以便在视图消失时清理
+            TimerManager.shared.voiceBlinkTimer = timer
+        }
+        .onDisappear {
+            // 清理定时器
+            TimerManager.shared.voiceBlinkTimer?.invalidate()
+            TimerManager.shared.voiceBlinkTimer = nil
         }
         .alert(isPresented: $showingPermissionAlert) {
             Alert(
@@ -252,5 +271,18 @@ struct VoiceCaptureView: View {
 struct VoiceCaptureView_Previews: PreviewProvider {
     static var previews: some View {
         VoiceCaptureView()
+    }
+}
+
+// 用于管理全局计时器，避免内存泄漏
+class TimerManager {
+    static let shared = TimerManager()
+    
+    var voiceBlinkTimer: Timer?
+    
+    private init() {}
+    
+    deinit {
+        voiceBlinkTimer?.invalidate()
     }
 } 

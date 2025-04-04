@@ -218,7 +218,7 @@ struct VoiceCloneView: View {
             if voiceCaptureManager.isRecording {
                 // 仅显示停止按钮
                 Button(action: {
-                    voiceCaptureManager.stopVoiceFileRecording()
+                    _ = voiceCaptureManager.stopVoiceFileRecording()
                 }) {
                     ZStack {
                         Circle()

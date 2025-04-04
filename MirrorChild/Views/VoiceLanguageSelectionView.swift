@@ -70,6 +70,8 @@ struct VoiceLanguageSelectionView: View {
                             presentationMode.wrappedValue.dismiss()
                         }) {
                             Text("完成")
+                                .font(.system(size: 17))
+                                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
                         }
                     }
                 }
