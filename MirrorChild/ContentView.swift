@@ -354,6 +354,7 @@ struct JapaneseStyleSettingsView: View {
     @State private var personalityTraits: [String] = ["calmTrait".localized, "kindTrait".localized, "helpfulTrait".localized]
     @State private var showingVoiceProfilePage = false
     @State private var showingLanguageSelectionPage = false
+    @State private var showingVoiceRecordingPage = false
     @ObservedObject private var voiceCaptureManager = VoiceCaptureManager.shared
     
     let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
@@ -400,6 +401,43 @@ struct JapaneseStyleSettingsView: View {
                         .padding(.vertical, 5)
                         .padding(.horizontal, 15)
                         
+                        // Voice profile section
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("voiceProfileLabel".localized)
+                                .font(.system(size: 18, weight: .medium))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                .padding(.leading, 10)
+                            
+                            // 录制语音样本按钮
+                            Button(action: {
+                                showingVoiceRecordingPage = true
+                            }) {
+                                HStack {
+                                    Text("voiceProfileInstructions".localized)
+                                        .font(.system(size: 16))
+                                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "mic.circle")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                }
+                                .padding(15)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                )
+                            }
+                            .padding(.horizontal, 10)
+                        }
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 15)
+                        
                         // Voice selection
                         VStack(alignment: .leading, spacing: 15) {
                             Text("voiceTypeLabel".localized)
@@ -422,42 +460,6 @@ struct JapaneseStyleSettingsView: View {
                                     .fill(Color.white)
                                     .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                             )
-                            .padding(.horizontal, 10)
-                        }
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 15)
-                        
-                        // Voice Profile Section
-                        VStack(alignment: .leading, spacing: 15) {
-                            Text("voiceProfileLabel".localized)
-                                .font(.system(size: 18, weight: .medium))
-                                .tracking(1)
-                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                                .padding(.leading, 10)
-                            
-                            Button(action: {
-                                showingVoiceProfilePage = true
-                            }) {
-                                HStack {
-                                    Text("customizeVoiceButton".localized)
-                                        .font(.system(size: 18, weight: .light))
-                                        .tracking(0.5)
-                                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.6))
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 16, weight: .light))
-                                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                                }
-                                .padding(.vertical, 15)
-                                .padding(.horizontal, 20)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                                )
-                            }
                             .padding(.horizontal, 10)
                         }
                         .padding(.vertical, 5)
@@ -556,6 +558,9 @@ struct JapaneseStyleSettingsView: View {
             }
             .sheet(isPresented: $showingLanguageSelectionPage) {
                 VoiceLanguageSelectionView()
+            }
+            .sheet(isPresented: $showingVoiceRecordingPage) {
+                VoiceProfileRecordingView()
             }
         }
     }

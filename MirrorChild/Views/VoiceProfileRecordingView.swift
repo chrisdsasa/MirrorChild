@@ -19,7 +19,7 @@ struct VoiceProfileRecordingView: View {
     
     // 常量
     private let maxRecordingTime: TimeInterval = 30 // 30秒录音
-    private let targetSampleTime = "30秒" // 目标样本时间
+    private let targetSampleTime = "targetRecordingTime".localized // 目标样本时间
     private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -143,7 +143,7 @@ struct VoiceProfileRecordingView: View {
                             
                             // 时间指示器
                             HStack {
-                                Text(String(format: "%.1f秒", recordingTime))
+                                Text(String(format: "recordingTime".localized, recordingTime))
                                     .font(.system(size: 14))
                                     .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
                                 
@@ -170,7 +170,7 @@ struct VoiceProfileRecordingView: View {
                                 HStack {
                                     Image(systemName: isPlayingBack ? "pause.fill" : "play.fill")
                                         .font(.system(size: 15))
-                                    Text(isPlayingBack ? "暂停" : "播放")
+                                    Text(isPlayingBack ? "pausePlayback".localized : "playRecording".localized)
                                         .font(.system(size: 16))
                                 }
                                 .foregroundColor(.white)
@@ -188,7 +188,7 @@ struct VoiceProfileRecordingView: View {
                                 HStack {
                                     Image(systemName: "arrow.counterclockwise")
                                         .font(.system(size: 15))
-                                    Text("重新录制")
+                                    Text("recordAgain".localized)
                                         .font(.system(size: 16))
                                 }
                                 .foregroundColor(.white)
@@ -206,7 +206,7 @@ struct VoiceProfileRecordingView: View {
                                 HStack {
                                     Image(systemName: isRecording ? "stop.fill" : "mic.fill")
                                         .font(.system(size: 15))
-                                    Text(isRecording ? "停止录制" : "开始录制")
+                                    Text(isRecording ? "stopRecording".localized : "startRecording".localized)
                                         .font(.system(size: 16))
                                 }
                                 .foregroundColor(.white)
@@ -257,7 +257,7 @@ struct VoiceProfileRecordingView: View {
                                 .font(.system(size: 50))
                                 .foregroundColor(.green)
                             
-                            Text("上传成功！")
+                            Text("uploadSuccess".localized)
                                 .font(.title2)
                                 .foregroundColor(.white)
                                 .fontWeight(.medium)
@@ -271,7 +271,7 @@ struct VoiceProfileRecordingView: View {
                                     dismiss()
                                 }
                             }) {
-                                Text("确定")
+                                Text("confirm".localized)
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .padding(.vertical, 10)
@@ -310,9 +310,9 @@ struct VoiceProfileRecordingView: View {
         }
         .alert(isPresented: $showingPermissionAlert) {
             Alert(
-                title: Text("权限需要"),
-                message: Text("需要麦克风权限来录制您的声音。请在设置中授予权限。"),
-                primaryButton: .default(Text("打开设置")) {
+                title: Text("permissionRequired".localized),
+                message: Text("microphonePermissionMessage".localized),
+                primaryButton: .default(Text("openSettingsButton".localized)) {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
                     }

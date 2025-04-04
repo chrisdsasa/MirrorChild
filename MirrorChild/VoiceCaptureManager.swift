@@ -72,7 +72,11 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     @Published var transcribedText = ""
     @Published var error: Error?
     @Published var permissionStatus: PermissionStatus = .notDetermined
-    @Published var enablePunctuation = true // 控制是否启用标点符号功能
+    @Published var enablePunctuation: Bool = true {
+        didSet {
+            UserDefaults.standard.set(enablePunctuation, forKey: "enablePunctuation")
+        }
+    }
     
     // 语言相关属性
     @Published var currentLanguage: VoiceLanguage = .chinese {
@@ -111,6 +115,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 self.currentLanguage = savedLanguage
             }
             
+            // 获取标点符号设置
+            self.enablePunctuation = UserDefaults.standard.bool(forKey: "enablePunctuation")
+            
             return
         }
         
@@ -119,6 +126,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
            let savedLanguage = VoiceLanguage(rawValue: savedLanguageCode) {
             self.currentLanguage = savedLanguage
         }
+        
+        // 获取标点符号设置
+        self.enablePunctuation = UserDefaults.standard.bool(forKey: "enablePunctuation")
         
         // 初始化音频引擎
         audioEngine = AVAudioEngine()
@@ -351,7 +361,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 // 根据当前选择的语言显示不同的模拟文本
                 switch self.currentLanguage {
                 case .english:
-                    self.transcribedText = "这是预览模式下的英语模拟录音文本。实际设备上会显示真实的语音转文字结果。"
+                    self.transcribedText = "This is simulated recording text in preview mode. Actual speech-to-text results will be shown on real devices."
                 case .chinese:
                     self.transcribedText = "这是预览模式下的模拟录音文本。实际设备上会显示真实的语音转文字结果。"
                 }
@@ -415,12 +425,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             // 配置音频会话
             do {
                 let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+                try audioSession.setCategory(.record, mode: .measurement)
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                print("音频会话配置成功，已启用后台模式")
-                
-                // 开始后台任务以支持后台录音
-                self.beginBackgroundTask()
+                print("音频会话配置成功")
             } catch {
                 print("错误：配置音频会话失败: \(error)")
                 completion(false, error)
@@ -443,13 +450,19 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 return
             }
             
-            // 启用实时结果和标点符号
+            // 启用实时结果
             recognitionRequest.shouldReportPartialResults = true
+            
+            // 设置是否添加标点符号（如果支持的话）
             if #available(iOS 16.0, *) {
-                recognitionRequest.addsPunctuation = self.enablePunctuation
-                print("标点符号功能状态: \(self.enablePunctuation ? "已启用" : "已禁用")")
+                if self.enablePunctuation {
+                    recognitionRequest.addsPunctuation = true
+                } else {
+                    recognitionRequest.addsPunctuation = false
+                }
+                print("标点符号设置: \(recognitionRequest.addsPunctuation)")
             } else {
-                print("当前iOS版本不支持自动标点符号功能")
+                print("当前iOS版本不支持设置标点符号自动添加")
             }
             
             print("开始语音识别任务，使用语言: \(self.currentLanguage.rawValue)")
