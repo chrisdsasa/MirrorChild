@@ -134,7 +134,7 @@ struct ContentView: View {
                                 .resizable()
                                 .scaledToFit()
                                 .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                                .frame(width: avatarSize * 0.65, height: avatarSize * 0.65)
+                                .frame(width: 70, height: 70)
                                 .offset(y: -6)
                         }
                     }
@@ -228,13 +228,6 @@ struct ContentView: View {
                     }
                 
                 Spacer()
-                
-                // Subtle instruction text
-                Text("selectPrompt".localized)
-                    .font(.appFont(size: 16, weight: .light))
-                    .tracking(1)
-                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.55))
-                    .padding(.bottom, 5)
                 
                 // Control buttons - Japanese-inspired
                 HStack(spacing: 60) {
@@ -482,7 +475,7 @@ struct JapaneseStyleSettingsView: View {
                         // Voice Profile Section
                         VStack(alignment: .leading, spacing: 15) {
                             Text("voiceProfileLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.appFont(size: 24, weight: .black))
                                 .tracking(1)
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                 .padding(.leading, 10)

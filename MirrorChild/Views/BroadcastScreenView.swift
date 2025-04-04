@@ -12,7 +12,7 @@ struct BroadcastScreenView: View {
             VStack(spacing: 20) {
                 // Title
                 Text("screenCaptureTitle".localized)
-                    .font(.system(size: 22, weight: .medium))
+                    .font(.appFont(size: 24, weight: .black))
                     .tracking(1)
                     .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                     .padding(.top, 20)

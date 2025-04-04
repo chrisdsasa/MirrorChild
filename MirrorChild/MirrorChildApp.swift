@@ -277,22 +277,6 @@ struct SimpleOnboardingView: View {
                         .font(.system(size: 24))
                         .foregroundColor(Color.pink.opacity(0.2))
                         .position(x: 30, y: geometry.size.height - 100)
-                    
-                    // Center decorative line
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.0),
-                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.3),
-                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.0)
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geometry.size.width, height: 1)
-                        .position(x: geometry.size.width/2, y: geometry.size.height/2 - 40)
                 }
             }
             
@@ -300,16 +284,18 @@ struct SimpleOnboardingView: View {
                 // Japanese-style welcome header
                 HStack {
                     Spacer()
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .center, spacing: 0) {
                         Text("welcome".localized)
-                            .font(.system(size: 42, weight: .bold))
+                            .font(.system(size: 50, weight: .bold))
                             .tracking(8)
                             .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            .padding(.bottom, 25)
                         
                         Text("appTitle".localized)
                             .font(.system(size: 38, weight: .heavy))
                             .tracking(2)
                             .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                            .padding(.bottom, 12)
                         
                         Text("digitalCompanion".localized)
                             .font(.system(size: 30, weight: .regular))
@@ -317,9 +303,10 @@ struct SimpleOnboardingView: View {
                             .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
                             .padding(.top, 5)
                     }
+                    .frame(maxWidth: .infinity)
                     Spacer()
                 }
-                .padding(.top, 30)
+                .padding(.top, 50)
                 
                 Spacer()
                 
@@ -352,58 +339,57 @@ struct SimpleOnboardingView: View {
                 }
                 
                 // Japanese-styled info card
-                VStack(spacing: 22) {
-                    Text("appIntroTitle".localized)
-                        .font(.system(size: 20, weight: .medium))
-                        .tracking(2)
-                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                    
-                    VStack(spacing: 14) {
+                VStack(spacing: 18) {
+                    VStack(spacing: 12) {
                         // Feature item
                         HStack(spacing: 15) {
-                            Image(systemName: "checkmark.circle")
+                            Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
                                 .font(.system(size: 22, weight: .light))
                             Text("feature1".localized)
-                                .font(.system(size: 17, weight: .light))
+                                .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
                         }
+                        .padding(.leading, 30)
                         
                         // Feature item
                         HStack(spacing: 15) {
-                            Image(systemName: "checkmark.circle")
+                            Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
                                 .font(.system(size: 22, weight: .light))
                             Text("feature2".localized)
-                                .font(.system(size: 17, weight: .light))
+                                .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
                         }
+                        .padding(.leading, 30)
                         
                         // Feature item
                         HStack(spacing: 15) {
-                            Image(systemName: "checkmark.circle")
+                            Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
                                 .font(.system(size: 22, weight: .light))
                             Text("feature3".localized)
-                                .font(.system(size: 17, weight: .light))
+                                .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                             Spacer()
                         }
+                        .padding(.leading, 30)
                     }
                     .padding(.horizontal, 8)
                 }
-                .padding(25)
+                .padding(20)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.9))
                         .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
                 )
                 .padding(.horizontal, 25)
-                .padding(.top, 10)
+                .padding(.top, 5)
                 
                 Spacer()
+                    .frame(height: 5)
                 
                 // Japanese-styled start button
                 Button(action: {
@@ -425,30 +411,15 @@ struct SimpleOnboardingView: View {
                             .font(.system(size: 20))
                             .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                     }
-                    .padding(.vertical, 16)
+                    .padding(.vertical, 14)
                     .padding(.horizontal, 40)
                     .background(
-                        RoundedRectangle(cornerRadius: 30)
-                            .stroke(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.5),
-                                        Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.5)
-                                    ]),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                lineWidth: 1.5
-                            )
-                            .background(
-                                RoundedRectangle(cornerRadius: 30)
-                                    .fill(Color.white.opacity(0.9))
-                            )
+                        Capsule()
+                            .fill(Color.white.opacity(0.9))
                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                     )
                 }
-                .buttonStyle(ScaleButtonStyle())  // 添加自定义按钮样式
-                .padding(.bottom, 50)
+                .padding(.bottom, 10)
                 .contentShape(Rectangle())  // 扩大点击区域
                 .allowsHitTesting(true)  // 确保按钮可点击
             }

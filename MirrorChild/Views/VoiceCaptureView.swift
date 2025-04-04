@@ -46,27 +46,12 @@ struct VoiceCaptureView: View {
             VStack(spacing: 20) {
                 // Title with elegant, minimalist design
                 HStack {
+                    Spacer()
                     Text("voiceProfileTitle".localized)
-                        .font(.appFont(size: 24, weight: .medium))
+                        .font(.appFont(size: 24, weight: .black))
                         .tracking(1)
                         .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                    
                     Spacer()
-                    
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Text("doneButton".localized)
-                            .font(.appFont(size: 16, weight: .medium))
-                            .tracking(1)
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 15)
-                            .background(
-                                Capsule()
-                                    .stroke(Color(red: 0.5, green: 0.5, blue: 0.7).opacity(0.3), lineWidth: 1)
-                            )
-                    }
                 }
                 .padding(.top, 20)
                 .padding(.horizontal)
@@ -90,37 +75,6 @@ struct VoiceCaptureView: View {
                         .fill(Color.white.opacity(0.9))
                         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                 )
-                
-                // Language indicator
-                if voiceCaptureManager.isRecording {
-                    HStack {
-                        Text("[\(voiceCaptureManager.currentLanguage.localizedName)]")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                        
-                        Spacer()
-                        
-                        // Language change button
-                        Button(action: {
-                            showLanguageSelection()
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 12))
-                                Text("switchLanguage".localized)
-                                    .font(.system(size: 14))
-                            }
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 10)
-                            .background(
-                                Capsule()
-                                    .stroke(Color(red: 0.5, green: 0.5, blue: 0.7).opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                    }
-                    .padding(.horizontal)
-                }
                 
                 // Transcription area
                 VStack {
@@ -219,43 +173,12 @@ struct VoiceCaptureView: View {
     private var transcriptionView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                if voiceCaptureManager.isRecording {
-                    HStack {
-                        Text("listeningMessage".localized)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color(red: 0.4, green: 0.6, blue: 0.5))
-                        
-                        // Animated dots
-                        HStack(spacing: 3) {
-                            ForEach(0..<3) { index in
-                                Circle()
-                                    .fill(Color(red: 0.4, green: 0.6, blue: 0.5))
-                                    .frame(width: 5, height: 5)
-                                    .opacity(0.5)
-                                    .animation(
-                                        Animation.easeInOut(duration: 0.5)
-                                            .repeatForever()
-                                            .delay(0.2 * Double(index)),
-                                        value: voiceCaptureManager.isRecording
-                                    )
-                            }
-                        }
-                    }
-                    .padding(.bottom, 5)
-                    
-                    // 显示当前使用的语言
-                    Text("[\(voiceCaptureManager.currentLanguage.localizedName)]")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                // 背景录音指示器
+                if UIApplication.shared.applicationState == .background && voiceCaptureManager.isRecording {
+                    Text("(后台录音中...)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color.orange)
                         .padding(.bottom, 5)
-                        
-                    // 背景录音指示器
-                    if UIApplication.shared.applicationState == .background && voiceCaptureManager.isRecording {
-                        Text("(后台录音中...)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color.orange)
-                            .padding(.bottom, 5)
-                    }
                 }
                 
                 // Preview mode shows simulated text
@@ -322,15 +245,6 @@ struct VoiceCaptureView: View {
         }
         
         voiceCaptureManager.stopRecording()
-    }
-    
-    private func showLanguageSelection() {
-        // This would normally show a sheet with language selection
-        // For now we'll just cycle through available languages
-        if let currentIndex = voiceCaptureManager.availableLanguages.firstIndex(of: voiceCaptureManager.currentLanguage) {
-            let nextIndex = (currentIndex + 1) % voiceCaptureManager.availableLanguages.count
-            voiceCaptureManager.switchLanguage(to: voiceCaptureManager.availableLanguages[nextIndex])
-        }
     }
 }
 
