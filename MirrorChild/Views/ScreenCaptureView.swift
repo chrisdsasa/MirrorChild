@@ -121,8 +121,8 @@ struct ScreenCaptureView: View {
         .alert(isPresented: $showingPermissionAlert) {
             Alert(
                 title: Text("permissionRequired".localized),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
+                message: Text("screenPermissionRequired".localized),
+                dismissButton: .default(Text("确定"))
             )
         }
         .alert(isPresented: $showingSettingsAlert) {
@@ -134,7 +134,7 @@ struct ScreenCaptureView: View {
                         UIApplication.shared.open(url)
                     }
                 },
-                secondaryButton: .cancel()
+                secondaryButton: .cancel(Text("取消"))
             )
         }
         .onDisappear {
