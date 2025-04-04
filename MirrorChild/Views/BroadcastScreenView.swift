@@ -62,13 +62,13 @@ struct BroadcastScreenView: View {
                 // Status indicator
                 HStack {
                     Circle()
-                        .fill(isRecording ? 
-                              (isPaused ? Color.orange.opacity(0.8) : Color.green.opacity(0.8)) : 
+                        .fill(isRecording ?
+                              (isPaused ? Color.orange.opacity(0.8) : Color.green.opacity(0.8)) :
                               Color.red.opacity(0.5))
                         .frame(width: 12, height: 12)
                     
-                    Text(isRecording ? 
-                         (isPaused ? "已暂停: \(formatTime(recordingTime))" : "录制中: \(formatTime(recordingTime))\(isRecordingInBackground ? " (后台)" : "")") : 
+                    Text(isRecording ?
+                         (isPaused ? "已暂停: \(formatTime(recordingTime))" : "录制中: \(formatTime(recordingTime))\(isRecordingInBackground ? " (后台)" : "")") :
                          "未开始录制")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
@@ -574,4 +574,4 @@ struct BroadcastScreenView: View {
         let tenths = Int((timeInterval - Double(Int(timeInterval))) * 10)
         return String(format: "%02d:%02d.%d", minutes, seconds, tenths)
     }
-} 
+}
