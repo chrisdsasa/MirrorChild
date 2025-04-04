@@ -22,6 +22,10 @@ struct VoiceProfileRecordingView: View {
     @State private var alertMessage = ""
     @State private var permissionStatus: AVAudioSession.RecordPermission = .undetermined
     
+    // 音频电平监控
+    @State private var audioLevels: [CGFloat] = Array(repeating: 0, count: 30)
+    @State private var meterTimer: Timer?
+    
     // 常量
     private let maxRecordingTime: TimeInterval = 30 // 30秒录音
     private let targetSampleTime = "targetRecordingTime".localized // 目标样本时间
@@ -111,6 +115,11 @@ struct VoiceProfileRecordingView: View {
         }
         .onAppear {
             checkPermission()
+        }
+        .onDisappear {
+            stopRecording()
+            stopPlayback()
+            meterTimer?.invalidate()
         }
         .onReceive(timer) { _ in
             updateTimer()
@@ -207,35 +216,102 @@ struct VoiceProfileRecordingView: View {
         }
     }
     
-    // 波形视图 - 模拟音频波形
+    // 波形视图 - 根据音频电平调整
     private var waveformView: some View {
         GeometryReader { geometry in
-            HStack(spacing: 4) {
-                ForEach(0..<Int(geometry.size.width / 8), id: \.self) { index in
-                    Capsule()
-                        .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
-                        .frame(width: 6, height: getWaveHeight(at: index, width: geometry.size.width))
-                        .animation(
-                            Animation.easeInOut(duration: 0.3)
-                                .repeatForever()
-                                .delay(Double(index) * 0.05),
-                            value: isRecording
-                        )
+            ZStack {
+                // 背景网格线
+                VStack(spacing: 30) {
+                    ForEach(0..<4) { _ in
+                        Rectangle()
+                            .fill(Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.2))
+                            .frame(height: 1)
+                    }
                 }
+                .frame(maxHeight: .infinity)
+                
+                // 波形图
+                HStack(spacing: 4) {
+                    ForEach(0..<audioLevels.count, id: \.self) { index in
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color(red: 0.4, green: 0.5, blue: 0.9),
+                                        Color(red: 0.5, green: 0.5, blue: 0.8),
+                                        Color(red: 0.6, green: 0.5, blue: 0.9)
+                                    ]),
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
+                            )
+                            .frame(width: 6, height: audioLevels[index])
+                            .animation(
+                                Animation.easeInOut(duration: 0.2),
+                                value: audioLevels[index]
+                            )
+                            .shadow(color: Color.purple.opacity(0.1), radius: 3, x: 0, y: 0)
+                    }
+                }
+                .frame(height: 120)
+                .frame(maxWidth: .infinity)
             }
-            .frame(height: 120)
         }
         .frame(height: 120)
     }
     
-    // 生成波形高度
-    private func getWaveHeight(at index: Int, width: CGFloat) -> CGFloat {
-        let baseHeight: CGFloat = 20
-        let maxAdditionalHeight: CGFloat = 100
-        let seed = Date().timeIntervalSince1970 + Double(index)
-        let randomFactor = sin(seed * 2) * 0.5 + 0.5 // 0.0-1.0
+    // 更新音频电平显示
+    private func updateAudioLevels() {
+        // 使用更高的采样率，0.03秒更新一次
+        meterTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { _ in
+            if let recorder = audioRecorder {
+                recorder.updateMeters()
+                // 使用峰值电平而不是平均电平，让波形更明显
+                let normalizedValue = self.normalizedPowerLevel(fromDecibels: recorder.peakPower(forChannel: 0))
+                
+                // 将新的电平添加到数组末尾，并移除最旧的
+                audioLevels.append(normalizedValue)
+                if audioLevels.count > 30 {
+                    audioLevels.removeFirst()
+                }
+            } else if let player = audioPlayer, isPlayingBack {
+                player.updateMeters()
+                // 使用峰值电平而不是平均电平，让波形更明显
+                let normalizedValue = self.normalizedPowerLevel(fromDecibels: player.peakPower(forChannel: 0))
+                
+                audioLevels.append(normalizedValue)
+                if audioLevels.count > 30 {
+                    audioLevels.removeFirst()
+                }
+            } else if !isRecording && !isPlayingBack {
+                // 逐渐降低所有条形高度
+                for i in 0..<audioLevels.count {
+                    audioLevels[i] = max(0, audioLevels[i] - 5)
+                }
+            }
+        }
+    }
+    
+    // 将分贝值转换为适合显示的高度
+    private func normalizedPowerLevel(fromDecibels decibels: Float) -> CGFloat {
+        // 分贝范围通常是 -160 到 0，转换为视觉高度
+        let minDb: Float = -50.0  // 最小检测分贝值
+        let maxHeight: CGFloat = 120.0 // 最大波形高度
+        let minHeight: CGFloat = 5.0   // 最小波形高度
         
-        return baseHeight + randomFactor * maxAdditionalHeight
+        var normalizedValue: CGFloat
+        if decibels < minDb {
+            normalizedValue = minHeight
+        } else {
+            // 将分贝值映射到0-1的范围，增强小音量的视觉效果
+            let dbRange = abs(minDb)
+            let normalizedDb = 1.0 - abs(decibels) / dbRange
+            
+            // 使用更强的非线性变换，让小声音也能产生明显波形
+            normalizedValue = minHeight + (pow(CGFloat(normalizedDb), 1.5) * (maxHeight - minHeight))
+        }
+        
+        return normalizedValue
     }
     
     // 检查麦克风权限
@@ -254,6 +330,9 @@ struct VoiceProfileRecordingView: View {
                 }
             }
         }
+        
+        // 初始化音频电平数组
+        audioLevels = Array(repeating: minHeight, count: 30)
     }
     
     // 开始/停止录制
@@ -272,22 +351,36 @@ struct VoiceProfileRecordingView: View {
         let audioFilename = documentPath.appendingPathComponent("voiceProfile_\(Date().timeIntervalSince1970).m4a")
         recordingURL = audioFilename
         
+        // 设置音频会话
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setActive(true)
+        } catch {
+            print("设置音频会话失败: \(error)")
+        }
+        
         // 录音设置
         let settings = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: 44100,
             AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+            AVEncoderBitRateKey: 128000
         ]
         
         do {
             audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+            audioRecorder?.isMeteringEnabled = true
             audioRecorder?.record()
             
             // 重置状态
             isRecording = true
             recordingTime = 0
             recordingProgress = 0
+            
+            // 开始监控音频电平
+            updateAudioLevels()
         } catch {
             print("录音启动失败: \(error)")
         }
@@ -313,12 +406,30 @@ struct VoiceProfileRecordingView: View {
         guard let url = recordingURL else { return }
         
         do {
+            // 设置音频会话以支持播放
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setActive(true)
+            
+            // 创建播放器
             audioPlayer = try AVAudioPlayer(contentsOf: url)
+            
+            // 确保启用音频电平监控
+            audioPlayer?.isMeteringEnabled = true
+            
+            // 设置代理以处理播放结束事件
             audioPlayer?.delegate = AVPlayerObserver(onDidFinishPlaying: {
-                isPlayingBack = false
+                DispatchQueue.main.async {
+                    self.isPlayingBack = false
+                }
             })
+            
+            // 开始播放
             audioPlayer?.play()
             isPlayingBack = true
+            
+            // 开始监控播放时的音频电平
+            updateAudioLevels()
         } catch {
             print("播放录音失败: \(error)")
         }
@@ -336,6 +447,7 @@ struct VoiceProfileRecordingView: View {
         recordingURL = nil
         recordingTime = 0
         recordingProgress = 0
+        audioLevels = Array(repeating: minHeight, count: 30)
     }
     
     // 上传录音
@@ -345,15 +457,7 @@ struct VoiceProfileRecordingView: View {
         
         // 模拟上传延迟
         withAnimation {
-            // 模拟上传进度
-            let uploadDuration = 1.5 // 1.5秒模拟上传
-            
-            // 模拟上传完成后显示成功提示
-            DispatchQueue.main.asyncAfter(deadline: .now() + uploadDuration) {
-                withAnimation {
-                    showingUploadSuccess = true
-                }
-            }
+            uploadSuccess = true
         }
     }
     
@@ -368,6 +472,9 @@ struct VoiceProfileRecordingView: View {
             }
         }
     }
+    
+    // 最小高度常量
+    private let minHeight: CGFloat = 5.0
 }
 
 // 辅助类：监听音频播放结束

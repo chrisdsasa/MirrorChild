@@ -171,12 +171,22 @@ struct VoiceCaptureView: View {
     
     // 转录视图
     private var transcriptionView: some View {
-        ScrollView {
-            Text(voiceCaptureManager.transcribedText)
-                .font(.system(size: 24))
-                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
-                .padding()
-                .textSelection(.enabled)
+        VStack(spacing: 15) {
+            // 实时波形显示
+            if voiceCaptureManager.isRecording {
+                LiveWaveformView()
+                    .frame(height: 60)
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+            }
+            
+            ScrollView {
+                Text(voiceCaptureManager.transcribedText)
+                    .font(.system(size: 24))
+                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
+                    .padding()
+                    .textSelection(.enabled)
+            }
         }
         .frame(maxWidth: .infinity)
         .background(
@@ -267,5 +277,78 @@ struct VoiceCaptureView: View {
 struct VoiceCaptureView_Previews: PreviewProvider {
     static var previews: some View {
         VoiceCaptureView()
+    }
+}
+
+// 实时波形视图
+struct LiveWaveformView: View {
+    @StateObject private var voiceCaptureManager = VoiceCaptureManager.shared
+    @State private var waveform: [CGFloat] = Array(repeating: 10, count: 40)
+    private let timer = Timer.publish(every: 0.03, on: .main, in: .common).autoconnect()
+    
+    // 彩色渐变效果
+    private let waveGradient = LinearGradient(
+        gradient: Gradient(colors: [
+            Color(red: 0.4, green: 0.5, blue: 0.9),
+            Color(red: 0.5, green: 0.5, blue: 0.8),
+            Color(red: 0.6, green: 0.5, blue: 0.9)
+        ]), 
+        startPoint: .leading, 
+        endPoint: .trailing
+    )
+    
+    var body: some View {
+        ZStack {
+            // 背景网格线
+            VStack(spacing: 20) {
+                ForEach(0..<3) { _ in
+                    Rectangle()
+                        .fill(Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.2))
+                        .frame(height: 1)
+                }
+            }
+            .frame(maxHeight: .infinity)
+            
+            // 波形
+            HStack(spacing: 2) {
+                ForEach(0..<waveform.count, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(waveGradient)
+                        .frame(width: 3, height: waveform[index])
+                        .animation(.easeInOut(duration: 0.2), value: waveform[index])
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .onReceive(timer) { _ in
+            // 更新波形, 左移数组并添加新值
+            var newWaveform = Array(waveform.dropFirst())
+            
+            // 将音频电平转换为视觉高度
+            let height = normalizedAudioLevel(from: voiceCaptureManager.currentAudioLevel)
+            newWaveform.append(height)
+            
+            waveform = newWaveform
+        }
+    }
+    
+    // 将音频电平转换为波形高度
+    private func normalizedAudioLevel(from level: Float) -> CGFloat {
+        // 音频电平通常为负分贝值，0分贝是最大值
+        let minDb: Float = -50.0
+        let maxDb: Float = -10.0
+        let minHeight: CGFloat = 5.0
+        let maxHeight: CGFloat = 60.0
+        
+        // 确保电平在有效范围内
+        let clampedLevel = max(min(level, maxDb), minDb)
+        
+        // 将分贝值归一化到0-1的范围
+        let normalizedLevel = (clampedLevel - minDb) / (maxDb - minDb)
+        
+        // 使用更强的非线性映射使效果更明显
+        let height = minHeight + (pow(CGFloat(normalizedLevel), 0.7) * (maxHeight - minHeight))
+        
+        return height
     }
 } 
