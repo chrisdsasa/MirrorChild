@@ -32,4 +32,10 @@ extension Color {
 extension Color {
     static let accentRebeccaPurple = Color(hex: "663399") // Rebecca Purple
     static let surfaceThistle = Color(hex: "D8BFD8") // Thistle
+    
+    // Theme colors
+    static let backgroundPrimary = surfaceThistle.opacity(0.2)
+    static let backgroundSecondary = surfaceThistle.opacity(0.1)
+    static let accentLight = accentRebeccaPurple.opacity(0.5)
+    static let accentDark = accentRebeccaPurple.opacity(0.8)
 } 

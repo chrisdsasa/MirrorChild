@@ -13,7 +13,7 @@ import UserNotifications
 
 // Define consistent accent color extension
 extension Color {
-    static let accentColor = Color(red: 0.45, green: 0.45, blue: 0.85)
+    static let accentColor = accentRebeccaPurple
 }
 
 // Add SplashScreenView definition before the MirrorChildApp struct
@@ -26,8 +26,9 @@ struct SplashScreenView: View {
             // Background gradient
             LinearGradient(
                 gradient: Gradient(colors: [
-                    Color(red: 0.95, green: 0.95, blue: 0.98),
-                    Color(red: 0.9, green: 0.9, blue: 0.95)
+                    Color(red: 0.9, green: 0.85, blue: 0.95), // 更柔和的淡紫色
+                    Color(red: 0.85, green: 0.8, blue: 0.92), // 中间过渡色
+                    Color(red: 0.82, green: 0.78, blue: 0.9)  // 略深的柔和紫色
                 ]),
                 startPoint: .top,
                 endPoint: .bottom
@@ -38,7 +39,16 @@ struct SplashScreenView: View {
                 // App logo/icon
                 Image(systemName: "person.fill")
                     .font(.system(size: 80))
-                    .foregroundColor(Color.accentColor)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.5, green: 0.3, blue: 0.7),
+                                Color(red: 0.6, green: 0.4, blue: 0.8)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                     .padding()
                 
                 // App name
@@ -114,7 +124,7 @@ struct MirrorChildApp: App {
             #if targetEnvironment(simulator)
             ZStack {
                 // Simple background
-                Color(red: 0.95, green: 0.95, blue: 0.98)
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                     .onAppear {
                         print("Simulator view loaded")
@@ -123,7 +133,7 @@ struct MirrorChildApp: App {
                 // Directly show content view
                 ContentView()
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                    .accentColor(Color.accentColor) // Set global accent color
+                    .accentColor(Color.accentRebeccaPurple) // Set global accent color
                 
                 // If onboarding needed, show at top layer
                 if showOnboarding {
@@ -142,7 +152,7 @@ struct MirrorChildApp: App {
                     // Main content view
                     ContentView()
                         .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                        .accentColor(Color.accentColor) // Set global accent color
+                        .accentColor(Color.accentRebeccaPurple) // Set global accent color
                         .onAppear {
                             // App launched, can perform non-critical operations
                             print("Content view appeared")
@@ -268,9 +278,9 @@ struct SimpleOnboardingView: View {
             // Subtle gradient background
             LinearGradient(
                 gradient: Gradient(colors: [
-                    Color(red: 0.97, green: 0.97, blue: 0.98),
-                    Color(red: 0.96, green: 0.96, blue: 0.98),
-                    Color(red: 0.95, green: 0.95, blue: 0.98)
+                    Color(red: 0.9, green: 0.85, blue: 0.95), // 更柔和的淡紫色
+                    Color(red: 0.85, green: 0.8, blue: 0.92), // 中间过渡色
+                    Color(red: 0.82, green: 0.78, blue: 0.9)  // 略深的柔和紫色
                 ]),
                 startPoint: .top,
                 endPoint: .bottom
@@ -289,13 +299,13 @@ struct SimpleOnboardingView: View {
                     // Top right cherry blossom
                     Image(systemName: "leaf.fill")
                         .font(.system(size: 30))
-                        .foregroundColor(Color.pink.opacity(0.3))
+                        .foregroundColor(Color.accentRebeccaPurple.opacity(0.3))
                         .position(x: geometry.size.width - 40, y: 60)
                     
                     // Bottom left cherry blossom
                     Image(systemName: "leaf.fill")
                         .font(.system(size: 24))
-                        .foregroundColor(Color.pink.opacity(0.2))
+                        .foregroundColor(Color.accentRebeccaPurple.opacity(0.2))
                         .position(x: 30, y: geometry.size.height - 100)
                     
                     // Center decorative line
@@ -303,9 +313,9 @@ struct SimpleOnboardingView: View {
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.0),
-                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.3),
-                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.0)
+                                    Color.accentRebeccaPurple.opacity(0.0),
+                                    Color.accentRebeccaPurple.opacity(0.3),
+                                    Color.accentRebeccaPurple.opacity(0.0)
                                 ]),
                                 startPoint: .leading,
                                 endPoint: .trailing
@@ -322,17 +332,17 @@ struct SimpleOnboardingView: View {
                     Text("welcome".localized)
                         .font(.system(size: 36, weight: .light))
                         .tracking(8)
-                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                        .foregroundColor(Color.accentRebeccaPurple.opacity(0.7))
                     
                     Text("appTitle".localized)
                         .font(.system(size: 28, weight: .light))
                         .tracking(2)
-                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                        .foregroundColor(Color.accentRebeccaPurple.opacity(0.8))
                     
                     Text("digitalCompanion".localized)
                         .font(.system(size: 20, weight: .light))
                         .tracking(4)
-                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                        .foregroundColor(Color.accentRebeccaPurple.opacity(0.6))
                         .padding(.top, 5)
                 }
                 .padding(.top, 30)
@@ -341,45 +351,67 @@ struct SimpleOnboardingView: View {
                 
                 // Stylized avatar in circular frame
                 ZStack {
+                    // 毛玻璃效果底层
                     Circle()
-                        .fill(Color.white.opacity(0.9))
+                        .fill(.ultraThinMaterial)
                         .frame(width: 160, height: 160)
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [
-                                            Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.4),
-                                            Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.4)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1.5
-                                )
+                    
+                    // 白色背景提供对比
+                    Circle()
+                        .fill(Color.white.opacity(0.7))
+                        .frame(width: 154, height: 154)
+                    
+                    // 渐变紫色边框
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.5, green: 0.3, blue: 0.7),
+                                    Color(red: 0.6, green: 0.4, blue: 0.8)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
                         )
-                        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                        .frame(width: 160, height: 160)
                     
                     Image(systemName: "person.fill")
                         .resizable()
                         .scaledToFit()
-                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.5, green: 0.3, blue: 0.7),
+                                    Color(red: 0.6, green: 0.4, blue: 0.8)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                         .frame(width: 70, height: 70)
                 }
+                .shadow(color: Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.2), radius: 15, x: 0, y: 8)
                 
                 // Japanese-styled info card
                 VStack(spacing: 22) {
                     Text("appIntroTitle".localized)
                         .font(.system(size: 20, weight: .medium))
                         .tracking(2)
-                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                        .foregroundColor(Color.accentRebeccaPurple)
                     
                     VStack(spacing: 14) {
                         // Feature item
                         HStack(spacing: 15) {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
-                                .font(.system(size: 22, weight: .light))
+                            ZStack {
+                                Circle()
+                                    .fill(Color.accentRebeccaPurple)
+                                    .frame(width: 28, height: 28)
+                                
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 14, weight: .bold))
+                            }
                             Text("feature1".localized)
                                 .font(.system(size: 17, weight: .light))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
@@ -388,9 +420,15 @@ struct SimpleOnboardingView: View {
                         
                         // Feature item
                         HStack(spacing: 15) {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
-                                .font(.system(size: 22, weight: .light))
+                            ZStack {
+                                Circle()
+                                    .fill(Color.accentRebeccaPurple)
+                                    .frame(width: 28, height: 28)
+                                
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 14, weight: .bold))
+                            }
                             Text("feature2".localized)
                                 .font(.system(size: 17, weight: .light))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
@@ -399,9 +437,15 @@ struct SimpleOnboardingView: View {
                         
                         // Feature item
                         HStack(spacing: 15) {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
-                                .font(.system(size: 22, weight: .light))
+                            ZStack {
+                                Circle()
+                                    .fill(Color.accentRebeccaPurple)
+                                    .frame(width: 28, height: 28)
+                                
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 14, weight: .bold))
+                            }
                             Text("feature3".localized)
                                 .font(.system(size: 17, weight: .light))
                                 .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
@@ -415,6 +459,10 @@ struct SimpleOnboardingView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.9))
                         .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.accentRebeccaPurple.opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal, 25)
                 .padding(.top, 10)
@@ -435,32 +483,34 @@ struct SimpleOnboardingView: View {
                         Text("startButton".localized)
                             .font(.system(size: 20, weight: .medium))
                             .tracking(4)
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            .foregroundColor(.white)
                         
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                            .foregroundColor(.white)
                     }
                     .padding(.vertical, 16)
                     .padding(.horizontal, 40)
                     .background(
-                        RoundedRectangle(cornerRadius: 30)
-                            .stroke(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.5),
-                                        Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.5)
-                                    ]),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                lineWidth: 1.5
-                            )
-                            .background(
-                                RoundedRectangle(cornerRadius: 30)
-                                    .fill(Color.white.opacity(0.9))
-                            )
-                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        ZStack {
+                            // 毛玻璃效果底层
+                            RoundedRectangle(cornerRadius: 30)
+                                .fill(.ultraThinMaterial)
+                            
+                            // 渐变紫色背景
+                            RoundedRectangle(cornerRadius: 30)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.8),
+                                            Color(red: 0.6, green: 0.4, blue: 0.8).opacity(0.8)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .shadow(color: Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.3), radius: 8, x: 0, y: 4)
+                        }
                     )
                 }
                 .buttonStyle(DesignSystem.ButtonStyles.ScaleButton())  // Add custom button style

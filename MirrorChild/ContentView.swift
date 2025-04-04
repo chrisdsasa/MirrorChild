@@ -40,9 +40,9 @@ struct ContentView: View {
             // Modern gradient background
             LinearGradient(
                 gradient: Gradient(colors: [
-                    Color(red: 0.95, green: 0.95, blue: 0.98),
-                    Color(red: 0.98, green: 0.98, blue: 1.0),
-                    Color(red: 0.95, green: 0.95, blue: 0.98)
+                    Color(red: 0.9, green: 0.85, blue: 0.95), // 更柔和的淡紫色
+                    Color(red: 0.85, green: 0.8, blue: 0.92), // 中间过渡色
+                    Color(red: 0.82, green: 0.78, blue: 0.9)  // 略深的柔和紫色
                 ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -54,14 +54,14 @@ struct ContentView: View {
                 ZStack {
                     // Top decorative element
                     Circle()
-                        .fill(Color.accentColor.opacity(0.05))
+                        .fill(Color.accentRebeccaPurple.opacity(0.05))
                         .frame(width: 300, height: 300)
                         .blur(radius: 50)
                         .offset(x: geometry.size.width * 0.3, y: -geometry.size.height * 0.2)
                     
                     // Bottom decorative element
                     Circle()
-                        .fill(Color.accentColor.opacity(0.05))
+                        .fill(Color.accentRebeccaPurple.opacity(0.05))
                         .frame(width: 250, height: 250)
                         .blur(radius: 40)
                         .offset(x: -geometry.size.width * 0.2, y: geometry.size.height * 0.3)
@@ -73,7 +73,16 @@ struct ContentView: View {
                 HStack {
                     Text("appTitle".localized)
                         .font(.system(size: 34, weight: .semibold, design: .rounded))
-                        .foregroundColor(.primary.opacity(0.9))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.5, green: 0.3, blue: 0.7),
+                                    Color(red: 0.6, green: 0.4, blue: 0.8)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .padding(.leading)
                     
                     Spacer()
@@ -81,18 +90,46 @@ struct ContentView: View {
                     Button(action: {
                         showingSettings = true
                     }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.primary.opacity(0.7))
-                            .frame(width: 44, height: 44)
-                            .background(
-                                .ultraThinMaterial,
-                                in: Circle()
-                            )
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-                            )
+                        ZStack {
+                            // 毛玻璃效果底层
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 44, height: 44)
+                            
+                            // 渐变紫色边框
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.5, green: 0.3, blue: 0.7),
+                                            Color(red: 0.6, green: 0.4, blue: 0.8)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                                .frame(width: 44, height: 44)
+                            
+                            // 带渐变的小圆形背景
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.7),
+                                            Color(red: 0.6, green: 0.4, blue: 0.8).opacity(0.6)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 36, height: 36)
+                            
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white)
+                        }
+                        .shadow(color: Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.3), radius: 5, x: 0, y: 3)
                     }
                     .buttonStyle(DesignSystem.ButtonStyles.ScaleButton())
                     .accessibilityLabel("settingsButton".localized)
@@ -104,31 +141,45 @@ struct ContentView: View {
                 
                 // Modern avatar design
                 ZStack {
-                    // Glassy background effect
+                    // 毛玻璃效果底层
                     Circle()
                         .fill(.ultraThinMaterial)
                         .frame(width: avatarSize, height: avatarSize)
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.5),
-                                            .white.opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1
-                                )
+                    
+                    // 白色背景提供对比
+                    Circle()
+                        .fill(Color.white.opacity(0.7))
+                        .frame(width: avatarSize - 6, height: avatarSize - 6)
+                    
+                    // 渐变紫色边框
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.5, green: 0.3, blue: 0.7),
+                                    Color(red: 0.6, green: 0.4, blue: 0.8)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
                         )
-                        .shadow(color: Color.black.opacity(0.1), radius: 20, x: 0, y: 10)
+                        .frame(width: avatarSize, height: avatarSize)
                     
                     // Modern avatar symbol
                     Image(systemName: "person.fill")
                         .resizable()
                         .scaledToFit()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.5, green: 0.3, blue: 0.7),
+                                    Color(red: 0.6, green: 0.4, blue: 0.8)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                         .frame(width: avatarSize * 0.4, height: avatarSize * 0.4)
                         .symbolEffect(.bounce, value: isMessageAnimating)
                     
@@ -136,10 +187,15 @@ struct ContentView: View {
                     if isMicrophoneActive || isScreenSharingActive {
                         Circle()
                             .stroke(
-                                isMicrophoneActive ? 
-                                    Color.red.opacity(0.3) : 
-                                    Color.green.opacity(0.3),
-                                lineWidth: 2
+                                LinearGradient(
+                                    colors: [
+                                        isMicrophoneActive ? Color.red.opacity(0.4) : Color.green.opacity(0.4),
+                                        isMicrophoneActive ? Color.red.opacity(0.7) : Color.green.opacity(0.7)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2.5
                             )
                             .frame(width: avatarSize + 20, height: avatarSize + 20)
                             .scaleEffect(isMicrophoneActive || isScreenSharingActive ? 1.1 : 1.0)
@@ -151,6 +207,7 @@ struct ContentView: View {
                             )
                     }
                 }
+                .shadow(color: Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.2), radius: 20, x: 0, y: 10)
                 .padding(.bottom, 20)
                 
                 // Message card with modern design
@@ -158,18 +215,36 @@ struct ContentView: View {
                     .font(.system(size: 20, weight: .regular, design: .rounded))
                     .lineSpacing(8)
                     .multilineTextAlignment(.center)
-                    .foregroundColor(.primary.opacity(0.8))
+                    .foregroundColor(Color(red: 0.3, green: 0.2, blue: 0.4))
                     .padding(.horizontal, 35)
                     .padding(.vertical, 30)
                     .background(
-                        .ultraThinMaterial,
-                        in: RoundedRectangle(cornerRadius: 24)
+                        ZStack {
+                            // 毛玻璃效果底层
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.ultraThinMaterial)
+                            
+                            // 白色背景提供对比
+                            RoundedRectangle(cornerRadius: 22)
+                                .fill(Color.white.opacity(0.7))
+                                .padding(2)
+                        }
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 24)
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.3),
+                                        Color(red: 0.6, green: 0.4, blue: 0.8).opacity(0.4)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.5
+                            )
                     )
-                    .shadow(color: Color.black.opacity(0.05), radius: 15, x: 0, y: 5)
+                    .shadow(color: Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.2), radius: 15, x: 0, y: 5)
                     .padding(.horizontal, 25)
                     .opacity(isMessageAnimating ? 1 : 0.9)
                     .animation(.easeInOut(duration: 0.3), value: isMessageAnimating)
@@ -182,24 +257,50 @@ struct ContentView: View {
                     Button(action: toggleMicrophone) {
                         VStack(spacing: 12) {
                             ZStack {
+                                // 毛玻璃效果底层
                                 Circle()
                                     .fill(.ultraThinMaterial)
                                     .frame(width: 70, height: 70)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                                
+                                // 渐变紫色边框
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.5, green: 0.3, blue: 0.7),
+                                                Color(red: 0.6, green: 0.4, blue: 0.8)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2
                                     )
-                                    .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                                    .frame(width: 70, height: 70)
+                                
+                                // 带渐变的圆形背景
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                isMicrophoneActive ? Color.red.opacity(0.3) : Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.7),
+                                                isMicrophoneActive ? Color.red.opacity(0.2) : Color(red: 0.6, green: 0.4, blue: 0.8).opacity(0.6)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 60, height: 60)
                                 
                                 Image(systemName: isMicrophoneActive ? "mic.fill" : "mic")
                                     .font(.system(size: 28))
-                                    .foregroundColor(isMicrophoneActive ? .red : .primary.opacity(0.7))
+                                    .foregroundColor(.white)
                                     .symbolEffect(.bounce, value: isMicrophoneActive)
                             }
+                            .shadow(color: Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.3), radius: 10, x: 0, y: 5)
                             
                             Text("voiceButtonLabel".localized)
                                 .font(.system(size: 16, weight: .medium, design: .rounded))
-                                .foregroundColor(.primary.opacity(0.7))
+                                .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.7))
                         }
                     }
                     .buttonStyle(DesignSystem.ButtonStyles.ScaleButton())
@@ -209,24 +310,50 @@ struct ContentView: View {
                     Button(action: toggleScreenSharing) {
                         VStack(spacing: 12) {
                             ZStack {
+                                // 毛玻璃效果底层
                                 Circle()
                                     .fill(.ultraThinMaterial)
                                     .frame(width: 70, height: 70)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                                
+                                // 渐变紫色边框
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.5, green: 0.3, blue: 0.7),
+                                                Color(red: 0.6, green: 0.4, blue: 0.8)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2
                                     )
-                                    .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                                    .frame(width: 70, height: 70)
+                                
+                                // 带渐变的圆形背景
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                isScreenSharingActive ? Color.green.opacity(0.3) : Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.7),
+                                                isScreenSharingActive ? Color.green.opacity(0.2) : Color(red: 0.6, green: 0.4, blue: 0.8).opacity(0.6)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 60, height: 60)
                                 
                                 Image(systemName: isScreenSharingActive ? "rectangle.on.rectangle.fill" : "rectangle.on.rectangle")
                                     .font(.system(size: 24))
-                                    .foregroundColor(isScreenSharingActive ? .green : .primary.opacity(0.7))
+                                    .foregroundColor(.white)
                                     .symbolEffect(.bounce, value: isScreenSharingActive)
                             }
+                            .shadow(color: Color(red: 0.5, green: 0.3, blue: 0.7).opacity(0.3), radius: 10, x: 0, y: 5)
                             
                             Text("screenButtonLabel".localized)
                                 .font(.system(size: 16, weight: .medium, design: .rounded))
-                                .foregroundColor(.primary.opacity(0.7))
+                                .foregroundColor(Color(red: 0.5, green: 0.3, blue: 0.7))
                         }
                     }
                     .buttonStyle(DesignSystem.ButtonStyles.ScaleButton())
