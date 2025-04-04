@@ -2,8 +2,10 @@ import Foundation
 import ReplayKit
 import Combine
 import SwiftUI
+import AVFoundation
+import UIKit
 
-class ScreenCaptureManager: NSObject, ObservableObject {
+class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate {
     static let shared = ScreenCaptureManager()
     
     private let recorder = RPScreenRecorder.shared()
@@ -15,10 +17,15 @@ class ScreenCaptureManager: NSObject, ObservableObject {
     @Published var error: Error?
     @Published var permissionStatus: PermissionStatus = .notDetermined
     
-    // For preview only
+    // For capture preview
     @Published var previewFrames: [UIImage] = []
     private var frameTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
+    private let maxFrameCount = 4
+    private let frameProcessingQueue = DispatchQueue(label: "com.mirrochild.frameprocessing", qos: .userInitiated)
+    
+    // Keep track of capturing state
+    private var isCapturing = false
     
     enum PermissionStatus {
         case notDetermined, denied, authorized
@@ -26,6 +33,10 @@ class ScreenCaptureManager: NSObject, ObservableObject {
     
     override init() {
         super.init()
+        
+        // Set up recorder delegate
+        recorder.delegate = self
+        
         // Listen for app entering background
         NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
             .sink { [weak self] _ in
@@ -33,6 +44,35 @@ class ScreenCaptureManager: NSObject, ObservableObject {
                 self.stopCapture()
             }
             .store(in: &cancellables)
+            
+        // Check if there's already an active session and stop it
+        if recorder.isRecording {
+            stopExistingRecordingSessions()
+        }
+    }
+    
+    // Clean up any existing recording sessions
+    private func stopExistingRecordingSessions() {
+        // Only attempt to stop recording if actually recording
+        if recorder.isRecording {
+            recorder.stopRecording { _,_  in 
+                // Recording stopped
+            }
+        }
+        
+        // Only attempt to stop capture if our internal state indicates we're capturing
+        if isCapturing {
+            recorder.stopCapture { [weak self] error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        // Log the error, but don't update UI state since this is just cleanup
+                        print("Error stopping existing capture: \(error.localizedDescription)")
+                    }
+                    self?.isCapturing = false
+                    self?.isRecording = false
+                }
+            }
+        }
     }
     
     // Call this to request permissions before trying to record
@@ -84,95 +124,184 @@ class ScreenCaptureManager: NSObject, ObservableObject {
             return
         }
         
-        // First ensure we have permissions
-        requestScreenCapturePermission { [weak self] granted in
+        // Don't start if already recording
+        if isRecording {
+            completion(true, nil)
+            return
+        }
+        
+        // Make sure any existing sessions are stopped first, but only if we think we're capturing
+        if isCapturing {
+            stopExistingRecordingSessions()
+        }
+        
+        // Clear any existing preview frames
+        previewFrames.removeAll()
+        
+        // Wait a moment for cleanup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
             
-            if !granted {
-                let error = NSError(domain: "com.mirrochild.screenrecording", 
-                                   code: 2,
-                                   userInfo: [NSLocalizedDescriptionKey: "Screen recording permission was denied."])
-                completion(false, error)
-                return
-            }
+            // Update internal state
+            self.isCapturing = true
             
-            // Now that we have permission, start the actual recording
-            self.recorder.startCapture { [weak self] (buffer, bufferType, error) in
-                if let error = error {
-                    self?.error = error
-                    self?.isRecording = false
-                }
-                
-                // Here you would process the CMSampleBuffer to:
-                // 1. Extract frames for preview
-                // 2. Send to server if needed
-                // 3. Process for AI analysis, etc.
-                
-            } completionHandler: { [weak self] error in
+            // Start the actual recording
+            self.recorder.startCapture(handler: { [weak self] (cmSampleBuffer, bufferType, error) in
                 guard let self = self else { return }
                 
                 if let error = error {
-                    self.error = error
-                    self.isRecording = false
-                    completion(false, error)
+                    DispatchQueue.main.async {
+                        self.error = error
+                        self.isRecording = false
+                        self.isCapturing = false
+                    }
                     return
                 }
                 
-                self.isRecording = true
+                // Process screen buffers only (not audio)
+                if bufferType == .video {
+                    self.processVideoFrame(cmSampleBuffer)
+                }
                 
-                // For demo purposes only - simulate receiving frames
-                self.startGeneratingPreviewFrames()
+            }, completionHandler: { [weak self] (error) in
+                guard let self = self else { return }
                 
-                completion(true, nil)
-            }
+                DispatchQueue.main.async {
+                    if let error = error {
+                        self.error = error
+                        self.isRecording = false
+                        self.isCapturing = false
+                        
+                        // Check if this is the "already active" error
+                        let nsError = error as NSError
+                        if nsError.localizedDescription.contains("already active") {
+                            // Try to stop and restart
+                            self.stopExistingRecordingSessions()
+                            // Notify user to try again
+                            completion(false, NSError(domain: "com.mirrochild.screenrecording", 
+                                                   code: 3,
+                                                   userInfo: [NSLocalizedDescriptionKey: "Please try again in a moment. Cleaning up previous recording session."]))
+                            return
+                        }
+                        
+                        self.permissionStatus = .denied
+                        completion(false, error)
+                        return
+                    }
+                    
+                    self.isRecording = true
+                    self.isCapturing = true
+                    self.permissionStatus = .authorized
+                    completion(true, nil)
+                }
+            })
         }
     }
     
     func stopCapture() {
-        guard isRecording else { return }
+        // Only attempt to stop if our app thinks we're recording or capturing
+        guard isRecording || isCapturing else { return }
         
-        stopGeneratingPreviewFrames()
+        // Clear preview frames when stopping
+        DispatchQueue.main.async {
+            self.previewFrames.removeAll()
+        }
+        
+        // Update internal state first to avoid multiple stop attempts
+        isCapturing = false
+        isRecording = false
         
         recorder.stopCapture { [weak self] error in
             DispatchQueue.main.async {
                 if let error = error {
-                    self?.error = error
+                    // Just log the error but don't update UI state since we're stopping
+                    print("Error in stopCapture: \(error.localizedDescription)")
                 }
-                self?.isRecording = false
             }
         }
     }
     
-    // MARK: - Demo Methods (for UI preview only)
+    // MARK: - Process Real Screen Capture Frames
     
-    private func startGeneratingPreviewFrames() {
-        // This simulates getting frames from the actual screen capture
-        // In a real implementation, you would process CMSampleBuffers from ReplayKit
-        frameTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+    private func processVideoFrame(_ sampleBuffer: CMSampleBuffer) {
+        // Only process occasional frames to avoid overloading
+        guard isRecording, 
+              previewFrames.count < maxFrameCount,
+              let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+            return
+        }
+        
+        // Process frames on a background queue to avoid UI stuttering
+        frameProcessingQueue.async { [weak self] in
             guard let self = self else { return }
             
-            // Generate a simple colored rectangle as a "frame"
-            let renderer = UIGraphicsImageRenderer(size: CGSize(width: 200, height: 350))
-            let image = renderer.image { ctx in
-                let colors: [UIColor] = [.systemBlue, .systemGreen, .systemRed, .systemPurple, .systemOrange]
-                let randomColor = colors.randomElement()!
-                ctx.cgContext.setFillColor(randomColor.cgColor)
-                ctx.cgContext.fill(CGRect(x: 0, y: 0, width: 200, height: 350))
-            }
+            // Convert CMSampleBuffer to UIImage
+            let ciImage = CIImage(cvPixelBuffer: imageBuffer)
+            let context = CIContext()
+            guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
             
+            // Scale down image to save memory
+            let uiImage = UIImage(cgImage: cgImage).scaledForPreview()
+            
+            // Update the UI on the main thread
             DispatchQueue.main.async {
-                if self.previewFrames.count > 3 {
-                    self.previewFrames.removeFirst()
+                // If we already have max frames, remove the oldest one
+                if self.previewFrames.count >= self.maxFrameCount {
+                    self.previewFrames.remove(at: 0)
                 }
-                self.previewFrames.append(image)
+                
+                // Add the new frame
+                self.previewFrames.append(uiImage)
             }
         }
-        frameTimer?.fire()
     }
     
-    private func stopGeneratingPreviewFrames() {
-        frameTimer?.invalidate()
-        frameTimer = nil
-        previewFrames.removeAll()
+    // MARK: - RPScreenRecorderDelegate
+    
+    func screenRecorderDidChangeAvailability(_ screenRecorder: RPScreenRecorder) {
+        // Update our state when availability changes
+        DispatchQueue.main.async {
+            if !screenRecorder.isAvailable {
+                self.permissionStatus = .denied
+            }
+        }
+    }
+    
+    func screenRecorder(_ screenRecorder: RPScreenRecorder, didStopRecordingWith error: Error, previewController: RPPreviewViewController?) {
+        // Handle recording stopped unexpectedly
+        DispatchQueue.main.async {
+            self.isRecording = false
+            self.isCapturing = false
+            self.error = error
+        }
+    }
+}
+
+// MARK: - UIImage Extensions
+
+extension UIImage {
+    // Scale down images for the preview
+    func scaledForPreview() -> UIImage {
+        let maxDimension: CGFloat = 300
+        
+        // Calculate new size
+        let originalSize = self.size
+        var newSize = originalSize
+        
+        if originalSize.width > maxDimension || originalSize.height > maxDimension {
+            let widthRatio = maxDimension / originalSize.width
+            let heightRatio = maxDimension / originalSize.height
+            let ratio = min(widthRatio, heightRatio)
+            
+            newSize = CGSize(width: originalSize.width * ratio, 
+                             height: originalSize.height * ratio)
+        }
+        
+        // Draw and return the resized image
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
+        defer { UIGraphicsEndImageContext() }
+        
+        self.draw(in: CGRect(origin: .zero, size: newSize))
+        return UIGraphicsGetImageFromCurrentImageContext() ?? self
     }
 } 

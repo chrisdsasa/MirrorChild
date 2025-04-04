@@ -39,6 +39,7 @@ struct PersistenceController {
         userMessage.timestamp = Date().addingTimeInterval(-60)
         userMessage.conversation = conversation
         
+        //Examples
         let assistantMessage = Message(context: viewContext)
         assistantMessage.content = "To make a phone call, tap on the green phone icon on your home screen. Then you can dial a number or select a contact."
         assistantMessage.isUserMessage = false

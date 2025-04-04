@@ -6,6 +6,7 @@ struct ScreenCaptureView: View {
     @State private var showingPermissionAlert = false
     @State private var alertMessage = ""
     @State private var showingSettingsAlert = false
+    @State private var isRetrying = false
     
     var body: some View {
         ZStack {
@@ -43,8 +44,12 @@ struct ScreenCaptureView: View {
                 // Preview area
                 VStack {
                     if screenCaptureManager.isRecording {
-                        screenPreviewGrid
-                            .padding()
+                        if screenCaptureManager.previewFrames.isEmpty {
+                            waitingForFramesView
+                        } else {
+                            screenPreviewGrid
+                                .padding()
+                        }
                     } else {
                         emptyPreviewState
                     }
@@ -60,8 +65,13 @@ struct ScreenCaptureView: View {
                 
                 // Control buttons
                 HStack(spacing: 30) {
-                    // Start/Stop button if recording already started
-                    if screenCaptureManager.isRecording {
+                    // Retry button
+                    if isRetrying {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                            .padding(.horizontal, 30)
+                    } else if screenCaptureManager.isRecording {
+                        // Stop button if recording
                         Button(action: stopCapture) {
                             Text("stopCapture".localized)
                                 .font(.system(size: 17, weight: .medium))
@@ -127,6 +137,27 @@ struct ScreenCaptureView: View {
                 secondaryButton: .cancel()
             )
         }
+        .onDisappear {
+            // Always ensure we stop capturing when the view disappears
+            // This prevents stray recordings that could cause errors later
+            if screenCaptureManager.isRecording {
+                screenCaptureManager.stopCapture()
+            }
+        }
+    }
+    
+    private var waitingForFramesView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .padding(.bottom, 10)
+            
+            Text("capturingScreen".localized)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
     }
     
     private var screenPreviewGrid: some View {
@@ -141,6 +172,8 @@ struct ScreenCaptureView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                     )
+                    .transition(.opacity)
+                    .animation(.easeInOut, value: screenCaptureManager.previewFrames.count)
             }
             
             // Empty placeholders to maintain grid layout
@@ -168,6 +201,12 @@ struct ScreenCaptureView: View {
                     .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
+            } else if isRetrying {
+                Text("cleaningUpMessage".localized)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
             } else {
                 Text("tapToStartCapture".localized)
                     .font(.system(size: 18, weight: .medium))
@@ -179,20 +218,50 @@ struct ScreenCaptureView: View {
     }
     
     private func startCapture() {
+        // Set retrying flag to show progress
+        isRetrying = true
+        
         // Direct start of screen capture which will trigger system permission dialog if needed
         screenCaptureManager.startCapture { success, error in
-            if !success, let error = error {
-                alertMessage = error.localizedDescription
-                showingPermissionAlert = true
-                
-                // Update permission status if we got a permission error
-                let nsError = error as NSError
-                if nsError.domain == RPRecordingErrorDomain {
-                    // Use the domain and error codes directly from NSError
-                    if nsError.code == 1301 || // .userDeclined (1301)
-                       nsError.code == 1302 {  // .noPermission (1302) 
-                        screenCaptureManager.permissionStatus = .denied
+            DispatchQueue.main.async {
+                if !success, let error = error {
+                    // Handle "already active" errors specially
+                    let nsError = error as NSError
+                    
+                    if nsError.localizedDescription.contains("already active") {
+                        // Wait and then automatically retry once
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            // Try again after a delay
+                            screenCaptureManager.startCapture { retrySuccess, retryError in
+                                DispatchQueue.main.async {
+                                    isRetrying = false
+                                    
+                                    if !retrySuccess, let retryError = retryError {
+                                        alertMessage = retryError.localizedDescription
+                                        showingPermissionAlert = true
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // For other errors, show the alert
+                        isRetrying = false
+                        alertMessage = error.localizedDescription
+                        showingPermissionAlert = true
+                        
+                        // Update permission status if we got a permission error
+                        let nsError = error as NSError
+                        if nsError.domain == RPRecordingErrorDomain {
+                            // Use the domain and error codes directly from NSError
+                            if nsError.code == 1301 || // .userDeclined (1301)
+                               nsError.code == 1302 {  // .noPermission (1302) 
+                                screenCaptureManager.permissionStatus = .denied
+                            }
+                        }
                     }
+                } else {
+                    // Successful start
+                    isRetrying = false
                 }
             }
         }

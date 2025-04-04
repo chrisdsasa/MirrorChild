@@ -52,6 +52,9 @@
 "openSettingsTitle" = "Enable Screen Recording";
 "openSettingsMessage" = "To enable screen recording, please go to Settings > Privacy > Screen Recording and enable permission for MirrorChild.";
 "openSettingsButton" = "Open Settings";
+"cleaningUpMessage" = "Preparing screen sharing... Please wait";
+"capturingScreen" = "Capturing screen content...";
+"tapToBroadcast" = "Tap the button below to start broadcasting your screen. Your screen will be shared even if you leave this app.";
 
 /* Onboarding screen */
 "welcome" = "Welcome";

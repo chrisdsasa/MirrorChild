@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var isMicrophoneActive = false
     @State private var isScreenSharingActive = false
     @State private var showingScreenCapture = false
+    @State private var showingBroadcastView = false
     
     // Constants
     let avatarSize: CGFloat = 160
@@ -281,8 +282,11 @@ struct ContentView: View {
         .sheet(isPresented: $showingSettings) {
             JapaneseStyleSettingsView()
         }
-        .sheet(isPresented: $showingScreenCapture) {
-            ScreenCaptureView()
+        .sheet(isPresented: $showingBroadcastView) {
+            BroadcastScreenView()
+                .onDisappear {
+                    isScreenSharingActive = BroadcastManager.shared.isBroadcasting
+                }
         }
     }
     
@@ -298,18 +302,8 @@ struct ContentView: View {
     }
     
     private func toggleScreenSharing() {
-        if isScreenSharingActive {
-            // Stop screen sharing
-            screenCaptureManager.stopCapture()
-            isScreenSharingActive = false
-            messageText = "screenOffMessage".localized
-            showingScreenCapture = false
-        } else {
-            // Show screen capture UI
-            isScreenSharingActive = true
-            messageText = "screenOnMessage".localized
-            showingScreenCapture = true
-        }
+        showingBroadcastView = true
+        messageText = "screenOnMessage".localized
     }
 }
 
