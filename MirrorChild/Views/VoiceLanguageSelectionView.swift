@@ -18,81 +18,58 @@ struct VoiceLanguageSelectionView: View {
                 
                 VStack(spacing: 20) {
                     // 标题说明
-                    Text("languageSelectionPrompt".localized)
+                    Text("选择语音识别语言")
                         .font(.headline)
                         .padding(.top)
                     
-                    // 语言列表
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(voiceCaptureManager.availableLanguages) { language in
-                                languageButton(for: language)
-                            }
-                            
-                            // 显示不可用的语言
-                            let unavailableLanguages = VoiceLanguage.allCases.filter { 
-                                !voiceCaptureManager.availableLanguages.contains($0) 
-                            }
-                            
-                            if !unavailableLanguages.isEmpty {
-                                Divider()
-                                    .padding(.vertical, 8)
-                                
-                                Text("languageNotAvailable".localized)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                    .padding(.top, 8)
-                                
-                                ForEach(unavailableLanguages) { language in
-                                    HStack {
-                                        Text(language.localizedName)
-                                            .foregroundColor(.gray)
-                                        Spacer()
-                                        Image(systemName: "xmark.circle")
-                                            .foregroundColor(.gray)
-                                    }
-                                    .padding()
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color.gray.opacity(0.1))
-                                    )
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
+                    // 简化的语言选择
+                    VStack(spacing: 15) {
+                        languageButton(for: .chinese)
+                        languageButton(for: .english)
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 20)
                     
                     // 显示当前选择的语言
-                    Text("currentLanguage".localized(with: selectedLanguage.localizedName))
+                    Text("当前语言: \(selectedLanguage.localizedName)")
                         .font(.headline)
                         .padding()
+                    
+                    // 提示信息
+                    Text("中文为默认语言，建议在中文环境下使用")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Spacer()
                     
                     // 应用按钮
                     Button(action: {
                         voiceCaptureManager.switchLanguage(to: selectedLanguage)
                         presentationMode.wrappedValue.dismiss()
                     }) {
-                        Text("switchLanguage".localized)
+                        Text("切换语言")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.blue)
+                                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
                             )
                     }
                     .padding(.horizontal)
-                    .disabled(!voiceCaptureManager.availableLanguages.contains(selectedLanguage))
+                    .padding(.bottom, 40)
                 }
-                .navigationTitle("voiceLanguageTitle".localized)
+                .navigationTitle("语音识别语言")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: {
                             presentationMode.wrappedValue.dismiss()
                         }) {
-                            Text("doneButton".localized)
+                            Text("完成")
                         }
                     }
                 }
@@ -108,20 +85,22 @@ struct VoiceLanguageSelectionView: View {
             HStack {
                 Text(language.localizedName)
                     .foregroundColor(.primary)
+                    .font(.system(size: 18))
                 
                 Spacer()
                 
                 // 显示选中状态
                 if selectedLanguage == language {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                        .font(.system(size: 22))
                 }
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 10)
                     .fill(selectedLanguage == language ? 
-                        Color.blue.opacity(0.1) : Color.white)
+                        Color(red: 0.5, green: 0.5, blue: 0.8).opacity(0.1) : Color.white)
                     .shadow(color: Color.black.opacity(0.05), radius: 2)
             )
         }

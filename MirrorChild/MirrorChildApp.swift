@@ -9,6 +9,7 @@ import SwiftUI
 import CoreData
 import Speech
 import AVFoundation
+import UserNotifications
 
 @main
 struct MirrorChildApp: App {
@@ -169,6 +170,15 @@ struct MirrorChildApp: App {
             try audioSession.setActive(true)
         } catch {
             print("Failed to set audio session category: \(error)")
+        }
+        
+        // 请求通知权限以支持后台录音通知
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if granted {
+                print("通知权限已获取")
+            } else if let error = error {
+                print("获取通知权限失败: \(error.localizedDescription)")
+            }
         }
     }
     

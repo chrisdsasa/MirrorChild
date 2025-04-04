@@ -263,6 +263,14 @@ struct VoiceCaptureView: View {
                         .font(.system(size: 12))
                         .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
                         .padding(.bottom, 5)
+                        
+                    // 背景录音指示器
+                    if UIApplication.shared.applicationState == .background && voiceCaptureManager.isRecording {
+                        Text("(后台录音中...)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color.orange)
+                            .padding(.bottom, 5)
+                    }
                 }
                 
                 // Preview mode shows simulated text

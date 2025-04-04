@@ -4,6 +4,7 @@ import AVFoundation
 import AVFAudio
 import Combine
 import SwiftUI
+import UserNotifications
 
 // 创建一个专用环境键，以便在预览中检测
 struct PreviewEnvironmentKey: EnvironmentKey {
@@ -19,9 +20,8 @@ extension EnvironmentValues {
 
 // 支持的语言枚举
 enum VoiceLanguage: String, CaseIterable, Identifiable {
-    case english = "en-US"
-    case japanese = "ja-JP"
     case chinese = "zh-CN"
+    case english = "en-US"
     
     var id: String { self.rawValue }
     
@@ -29,26 +29,16 @@ enum VoiceLanguage: String, CaseIterable, Identifiable {
     var localizedName: String {
         switch self {
         case .english:
-            return "English".localized
-        case .japanese:
-            return "Japanese".localized
+            return "英语"
         case .chinese:
-            return "Chinese".localized
+            return "中文"
         }
     }
     
-    // 从设备当前语言获取默认语言
+    // 默认使用中文，其次是英文
     static var deviceDefault: VoiceLanguage {
-        let languageCode = Locale.current.language.languageCode?.identifier ?? "en"
-        
-        switch languageCode {
-        case "ja":
-            return .japanese
-        case "zh":
-            return .chinese
-        default:
-            return .english
-        }
+        // 直接返回中文作为默认选项
+        return .chinese
     }
 }
 
@@ -76,6 +66,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioEngine: AVAudioEngine?
+    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     
     @Published var isRecording = false
     @Published var transcribedText = ""
@@ -84,7 +75,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     @Published var enablePunctuation = true // 控制是否启用标点符号功能
     
     // 语言相关属性
-    @Published var currentLanguage: VoiceLanguage = VoiceLanguage.deviceDefault {
+    @Published var currentLanguage: VoiceLanguage = .chinese {
         didSet {
             // 当语言改变时，更新语音识别器
             updateSpeechRecognizer()
@@ -136,13 +127,78 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         updateSpeechRecognizer()
         checkAvailableLanguages()
         
-        // 监听应用进入后台（非预览模式）
-        NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
+        // 设置应用状态监听
+        setupNotifications()
+    }
+    
+    // 设置通知监听
+    private func setupNotifications() {
+        // 监听应用进入后台
+        NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
             .sink { [weak self] _ in
                 guard let self = self, self.isRecording else { return }
-                self.stopRecording()
+                // 应用进入后台但继续录音，开始后台任务
+                self.beginBackgroundTask()
+                print("应用进入后台，继续录音转文字")
             }
             .store(in: &cancellables)
+        
+        // 监听应用回到前台
+        NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                // 结束后台任务
+                self.endBackgroundTask()
+                print("应用回到前台")
+            }
+            .store(in: &cancellables)
+    }
+    
+    // 开始后台任务
+    private func beginBackgroundTask() {
+        guard !isRunningInPreview else { return }
+        
+        // 结束之前的后台任务（如果有）
+        endBackgroundTask()
+        
+        // 开始一个新的后台任务
+        backgroundTask = UIApplication.shared.beginBackgroundTask { [weak self] in
+            // 这是后台任务即将过期的回调
+            print("后台任务即将过期")
+            self?.endBackgroundTask()
+        }
+        
+        print("已开始后台任务，ID: \(backgroundTask)")
+        
+        // 显示一个本地通知，告知用户应用在后台录音
+        showBackgroundRecordingNotification()
+    }
+    
+    // 显示后台录音通知
+    private func showBackgroundRecordingNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "录音继续进行中"
+        content.body = "MirrorChild正在后台继续录音转文字"
+        content.sound = .none
+        
+        // 立即触发通知
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "backgroundRecording", content: content, trigger: trigger)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("发送后台录音通知失败: \(error)")
+            }
+        }
+    }
+    
+    // 结束后台任务
+    private func endBackgroundTask() {
+        guard !isRunningInPreview, backgroundTask != .invalid else { return }
+        
+        print("结束后台任务，ID: \(backgroundTask)")
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
     }
     
     // 更新语音识别器以匹配当前选择的语言
@@ -295,9 +351,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 // 根据当前选择的语言显示不同的模拟文本
                 switch self.currentLanguage {
                 case .english:
-                    self.transcribedText = "This is simulated recording text in preview mode. Actual speech-to-text results will be shown on real devices."
-                case .japanese:
-                    self.transcribedText = "これはプレビューモードでのシミュレーションされた録音テキストです。実際のデバイスでは、実際の音声からテキストへの結果が表示されます。"
+                    self.transcribedText = "这是预览模式下的英语模拟录音文本。实际设备上会显示真实的语音转文字结果。"
                 case .chinese:
                     self.transcribedText = "这是预览模式下的模拟录音文本。实际设备上会显示真实的语音转文字结果。"
                 }
@@ -361,9 +415,12 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             // 配置音频会话
             do {
                 let audioSession = AVAudioSession.sharedInstance()
-                try audioSession.setCategory(.record, mode: .measurement)
+                try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                print("音频会话配置成功")
+                print("音频会话配置成功，已启用后台模式")
+                
+                // 开始后台任务以支持后台录音
+                self.beginBackgroundTask()
             } catch {
                 print("错误：配置音频会话失败: \(error)")
                 completion(false, error)
@@ -472,6 +529,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         
         recognitionRequest = nil
         recognitionTask = nil
+        
+        // 结束后台任务
+        endBackgroundTask()
     }
     
     // 重置录音状态
