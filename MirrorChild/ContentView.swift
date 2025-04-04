@@ -322,10 +322,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingBroadcastView) {
             BroadcastScreenView()
-                .onDisappear {
-                    isScreenSharingActive = BroadcastManager.shared.isBroadcasting
-                }
-                .preferredColorScheme(.light)
         }
         .sheet(isPresented: $showingVoiceCapture) {
             VoiceCaptureView()
