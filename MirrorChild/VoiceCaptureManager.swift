@@ -81,6 +81,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     @Published var transcribedText = ""
     @Published var error: Error?
     @Published var permissionStatus: PermissionStatus = .notDetermined
+    @Published var enablePunctuation = true // 控制是否启用标点符号功能
     
     // 语言相关属性
     @Published var currentLanguage: VoiceLanguage = VoiceLanguage.deviceDefault {
@@ -385,8 +386,14 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 return
             }
             
-            // 启用实时结果
+            // 启用实时结果和标点符号
             recognitionRequest.shouldReportPartialResults = true
+            if #available(iOS 16.0, *) {
+                recognitionRequest.addsPunctuation = self.enablePunctuation
+                print("标点符号功能状态: \(self.enablePunctuation ? "已启用" : "已禁用")")
+            } else {
+                print("当前iOS版本不支持自动标点符号功能")
+            }
             
             print("开始语音识别任务，使用语言: \(self.currentLanguage.rawValue)")
             // 开始识别任务
