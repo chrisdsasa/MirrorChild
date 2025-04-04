@@ -15,6 +15,7 @@
 "voiceOffMessage" = "音声アシスタンスがオフになりました。";
 "screenOnMessage" = "画面を確認しています。";
 "screenOffMessage" = "画面共有が停止しました。";
+"voiceErrorMessage" = "音声認識にエラーが発生しました。もう一度お試しください。";
 
 /* Settings screen */
 "settingsTitle" = "設定";
@@ -34,6 +35,17 @@
 "voiceProfileInstructions" = "あなたの声、または複製したい声のサンプルを録音してください。最良の結果を得るには、少なくとも15秒の明瞭な音声を録音してください。";
 "uploadVoiceProfile" = "音声サンプルをアップロード";
 "savedRecordings" = "保存された録音";
+
+/* Voice Language Settings */
+"voiceLanguageTitle" = "音声言語";
+"languageSelectionPrompt" = "音声認識に使用する言語を選択してください";
+"English" = "英語";
+"Japanese" = "日本語";
+"Chinese" = "中国語";
+"deviceDefaultLanguage" = "デバイスのデフォルト";
+"languageNotAvailable" = "この言語はお使いのデバイスでは利用できません";
+"switchLanguage" = "言語を切り替える";
+"currentLanguage" = "現在: %@";
 
 /* Screen Capture screen */
 "screenCaptureTitle" = "画面共有";

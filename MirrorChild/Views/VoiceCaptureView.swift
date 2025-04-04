@@ -176,6 +176,12 @@ struct VoiceCaptureView: View {
                         }
                     }
                     .padding(.bottom, 5)
+                    
+                    // 显示当前使用的语言
+                    Text("[\(voiceCaptureManager.currentLanguage.localizedName)]")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                        .padding(.bottom, 5)
                 }
                 
                 // 预览模式下显示模拟文本

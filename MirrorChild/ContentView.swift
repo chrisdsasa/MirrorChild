@@ -353,6 +353,8 @@ struct JapaneseStyleSettingsView: View {
     @State private var selectedVoice = "shimmer"
     @State private var personalityTraits: [String] = ["calmTrait".localized, "kindTrait".localized, "helpfulTrait".localized]
     @State private var showingVoiceProfilePage = false
+    @State private var showingLanguageSelectionPage = false
+    @ObservedObject private var voiceCaptureManager = VoiceCaptureManager.shared
     
     let availableVoices = ["shimmer", "echo", "fable", "onyx", "nova"]
 
@@ -364,6 +366,40 @@ struct JapaneseStyleSettingsView: View {
                 
                 ScrollView {
                     VStack(spacing: 30) {
+                        // Voice language selection
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("voiceLanguageTitle".localized)
+                                .font(.system(size: 18, weight: .medium))
+                                .tracking(1)
+                                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                                .padding(.leading, 10)
+                            
+                            Button(action: {
+                                showingLanguageSelectionPage = true
+                            }) {
+                                HStack {
+                                    Text(voiceCaptureManager.currentLanguage.localizedName)
+                                        .font(.system(size: 16))
+                                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.7))
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                }
+                                .padding(15)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                )
+                            }
+                            .padding(.horizontal, 10)
+                        }
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 15)
+                        
                         // Voice selection
                         VStack(alignment: .leading, spacing: 15) {
                             Text("voiceTypeLabel".localized)
@@ -517,6 +553,9 @@ struct JapaneseStyleSettingsView: View {
             }
             .sheet(isPresented: $showingVoiceProfilePage) {
                 VoiceProfileView()
+            }
+            .sheet(isPresented: $showingLanguageSelectionPage) {
+                VoiceLanguageSelectionView()
             }
         }
     }
