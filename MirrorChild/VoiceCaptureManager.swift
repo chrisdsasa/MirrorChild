@@ -17,6 +17,41 @@ extension EnvironmentValues {
     }
 }
 
+// 支持的语言枚举
+enum VoiceLanguage: String, CaseIterable, Identifiable {
+    case english = "en-US"
+    case japanese = "ja-JP"
+    case chinese = "zh-CN"
+    
+    var id: String { self.rawValue }
+    
+    // 语言的本地化显示名称
+    var localizedName: String {
+        switch self {
+        case .english:
+            return "English".localized
+        case .japanese:
+            return "Japanese".localized
+        case .chinese:
+            return "Chinese".localized
+        }
+    }
+    
+    // 从设备当前语言获取默认语言
+    static var deviceDefault: VoiceLanguage {
+        let languageCode = Locale.current.language.languageCode?.identifier ?? "en"
+        
+        switch languageCode {
+        case "ja":
+            return .japanese
+        case "zh":
+            return .chinese
+        default:
+            return .english
+        }
+    }
+}
+
 class VoiceCaptureManager: NSObject, ObservableObject {
     static var shared: VoiceCaptureManager = {
         // 在初始化静态变量时检查是否在预览中
@@ -47,6 +82,19 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     @Published var error: Error?
     @Published var permissionStatus: PermissionStatus = .notDetermined
     
+    // 语言相关属性
+    @Published var currentLanguage: VoiceLanguage = VoiceLanguage.deviceDefault {
+        didSet {
+            // 当语言改变时，更新语音识别器
+            updateSpeechRecognizer()
+            // 保存用户选择
+            UserDefaults.standard.set(currentLanguage.rawValue, forKey: "selectedVoiceLanguage")
+        }
+    }
+    
+    // 获取所有可用的语音识别语言
+    @Published var availableLanguages: [VoiceLanguage] = []
+    
     private var cancellables = Set<AnyCancellable>()
     private var micPermissionGranted = false
     
@@ -63,12 +111,29 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         // 如果在预览模式下，直接将权限设为已授权，不进行任何实际初始化
         if isRunningInPreview {
             self.permissionStatus = .authorized
+            self.availableLanguages = VoiceLanguage.allCases
+            
+            // 从用户默认设置中获取已保存的语言选择
+            if let savedLanguageCode = UserDefaults.standard.string(forKey: "selectedVoiceLanguage"),
+               let savedLanguage = VoiceLanguage(rawValue: savedLanguageCode) {
+                self.currentLanguage = savedLanguage
+            }
+            
             return
         }
         
-        // 只在非预览模式下初始化实际服务
-        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
+        // 从用户默认设置中获取已保存的语言选择
+        if let savedLanguageCode = UserDefaults.standard.string(forKey: "selectedVoiceLanguage"),
+           let savedLanguage = VoiceLanguage(rawValue: savedLanguageCode) {
+            self.currentLanguage = savedLanguage
+        }
+        
+        // 初始化音频引擎
         audioEngine = AVAudioEngine()
+        
+        // 初始化语音识别器和检查可用语言
+        updateSpeechRecognizer()
+        checkAvailableLanguages()
         
         // 监听应用进入后台（非预览模式）
         NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
@@ -77,6 +142,65 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 self.stopRecording()
             }
             .store(in: &cancellables)
+    }
+    
+    // 更新语音识别器以匹配当前选择的语言
+    private func updateSpeechRecognizer() {
+        guard !isRunningInPreview else { return }
+        
+        let locale = Locale(identifier: currentLanguage.rawValue)
+        speechRecognizer = SFSpeechRecognizer(locale: locale)
+        
+        // 如果当前正在录音，需要重新启动录音以使用新的语音识别器
+        if isRecording {
+            stopRecording()
+            startRecording { success, error in
+                if !success {
+                    print("更改语言后重新启动录音失败: \(error?.localizedDescription ?? "未知错误")")
+                }
+            }
+        }
+    }
+    
+    // 检查设备上支持哪些语言
+    private func checkAvailableLanguages() {
+        guard !isRunningInPreview else {
+            // 预览模式下假设所有语言都可用
+            self.availableLanguages = VoiceLanguage.allCases
+            return
+        }
+        
+        var supported: [VoiceLanguage] = []
+        
+        for language in VoiceLanguage.allCases {
+            let locale = Locale(identifier: language.rawValue)
+            if SFSpeechRecognizer(locale: locale)?.isAvailable == true {
+                supported.append(language)
+            }
+        }
+        
+        // 如果没有可用的语言，至少添加英语作为备选
+        if supported.isEmpty {
+            supported.append(.english)
+        }
+        
+        // 更新可用语言列表
+        self.availableLanguages = supported
+        
+        // 如果当前选择的语言不在支持列表中，切换到第一个可用语言
+        if !supported.contains(currentLanguage) {
+            currentLanguage = supported.first ?? .english
+        }
+    }
+    
+    // 切换语言
+    func switchLanguage(to language: VoiceLanguage) {
+        guard availableLanguages.contains(language) else {
+            print("不支持的语言: \(language.localizedName)")
+            return
+        }
+        
+        currentLanguage = language
     }
     
     func checkPermissionStatus() {
@@ -167,7 +291,15 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             isRecording = true
             // 提供一些模拟的转录文本
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.transcribedText = "这是预览模式下的模拟录音文本。实际设备上会显示真实的语音转文字结果。"
+                // 根据当前选择的语言显示不同的模拟文本
+                switch self.currentLanguage {
+                case .english:
+                    self.transcribedText = "This is simulated recording text in preview mode. Actual speech-to-text results will be shown on real devices."
+                case .japanese:
+                    self.transcribedText = "これはプレビューモードでのシミュレーションされた録音テキストです。実際のデバイスでは、実際の音声からテキストへの結果が表示されます。"
+                case .chinese:
+                    self.transcribedText = "这是预览模式下的模拟录音文本。实际设备上会显示真实的语音转文字结果。"
+                }
                 completion(true, nil)
             }
             return
@@ -256,7 +388,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             // 启用实时结果
             recognitionRequest.shouldReportPartialResults = true
             
-            print("开始语音识别任务...")
+            print("开始语音识别任务，使用语言: \(self.currentLanguage.rawValue)")
             // 开始识别任务
             self.recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 guard let self = self else { return }
@@ -283,56 +415,70 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             let recordingFormat = inputNode.outputFormat(forBus: 0)
             
             // 安装音频捕获
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, time in
                 self.recognitionRequest?.append(buffer)
             }
             
-            print("启动音频引擎...")
             // 启动音频引擎
             do {
                 audioEngine.prepare()
                 try audioEngine.start()
+                
+                // 更新状态
                 self.isRecording = true
-                print("录音已开始")
+                print("录音已成功启动")
+                
                 completion(true, nil)
             } catch {
-                self.resetRecording()
-                print("启动音频引擎错误: \(error)")
+                self.error = error
+                print("错误：启动音频引擎失败: \(error)")
                 completion(false, error)
             }
         }
     }
     
+    // 停止录音
     func stopRecording() {
-        // 在预览模式下仅重置状态
+        // 预览模式下直接重置状态
         if isRunningInPreview {
             isRecording = false
             return
         }
         
-        // 停止录音
-        if isRecording {
-            audioEngine?.stop()
-            audioEngine?.inputNode.removeTap(onBus: 0)
-            recognitionRequest?.endAudio()
-            isRecording = false
+        guard isRecording else { return }
+        
+        // 停止音频引擎和识别任务
+        audioEngine?.stop()
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        
+        // 重置状态
+        isRecording = false
+        
+        // 尝试停用音频会话
+        do {
+            try AVAudioSession.sharedInstance().setActive(false)
+        } catch {
+            print("停用音频会话失败: \(error)")
         }
         
-        // 重置
-        resetRecording()
-        
-        // 关闭音频会话
-        try? AVAudioSession.sharedInstance().setActive(false)
+        recognitionRequest = nil
+        recognitionTask = nil
     }
     
+    // 重置录音状态
     private func resetRecording() {
-        // 在预览模式下不进行任何操作
-        if isRunningInPreview {
-            return
+        // 停止之前的任务，如果有的话
+        if let recognitionTask = recognitionTask {
+            recognitionTask.cancel()
+            self.recognitionTask = nil
         }
         
-        recognitionTask?.cancel()
-        recognitionTask = nil
-        recognitionRequest = nil
+        // 移除任何现有的音频捕获
+        if audioEngine?.isRunning == true {
+            audioEngine?.stop()
+            audioEngine?.inputNode.removeTap(onBus: 0)
+        }
     }
 } 

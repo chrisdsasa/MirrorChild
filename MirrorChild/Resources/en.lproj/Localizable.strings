@@ -15,6 +15,7 @@
 "voiceOffMessage" = "Voice assistance is off.";
 "screenOnMessage" = "I can see your screen now.";
 "screenOffMessage" = "Screen sharing is stopped.";
+"voiceErrorMessage" = "There was an error with voice recognition. Please try again.";
 
 /* Settings screen */
 "settingsTitle" = "Settings";
@@ -34,6 +35,17 @@
 "voiceProfileInstructions" = "Record a sample of your voice or the voice you want to replicate. For best results, record at least 15 seconds of clear speech.";
 "uploadVoiceProfile" = "Upload Voice Sample";
 "savedRecordings" = "Saved Recordings";
+
+/* Voice Language Settings */
+"voiceLanguageTitle" = "Voice Language";
+"languageSelectionPrompt" = "Select language for voice recognition";
+"English" = "English";
+"Japanese" = "Japanese";
+"Chinese" = "Chinese";
+"deviceDefaultLanguage" = "Device Default";
+"languageNotAvailable" = "This language is not available on your device";
+"switchLanguage" = "Switch Language";
+"currentLanguage" = "Current: %@";
 
 /* Screen Capture screen */
 "screenCaptureTitle" = "Screen Sharing";
