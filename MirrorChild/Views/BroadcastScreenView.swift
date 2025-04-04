@@ -3,6 +3,7 @@ import ReplayKit
 import UserNotifications
 import AVFoundation
 import BackgroundTasks
+import Photos
 
 struct BroadcastScreenView: View {
     @StateObject private var broadcastManager = BroadcastManager.shared
@@ -18,6 +19,11 @@ struct BroadcastScreenView: View {
     @State private var capturedImage: UIImage?
     @State private var showPermissionAlert = false
     @State private var isRecordingInBackground = true  // 默认开启后台录制
+    @State private var recordingURL: URL?
+    @State private var showingSaveSuccess = false
+    
+    // 屏幕录制器
+    private let screenRecorder = ScreenRecorder()
     
     // 后台任务ID
     @State private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
@@ -62,13 +68,13 @@ struct BroadcastScreenView: View {
                 // Status indicator
                 HStack {
                     Circle()
-                        .fill(isRecording ?
-                              (isPaused ? Color.orange.opacity(0.8) : Color.green.opacity(0.8)) :
+                        .fill(isRecording ? 
+                              (isPaused ? Color.orange.opacity(0.8) : Color.green.opacity(0.8)) : 
                               Color.red.opacity(0.5))
                         .frame(width: 12, height: 12)
                     
-                    Text(isRecording ?
-                         (isPaused ? "已暂停: \(formatTime(recordingTime))" : "录制中: \(formatTime(recordingTime))\(isRecordingInBackground ? " (后台)" : "")") :
+                    Text(isRecording ? 
+                         (isPaused ? "已暂停: \(formatTime(recordingTime))" : "录制中: \(formatTime(recordingTime))\(isRecordingInBackground ? " (后台)" : "")") : 
                          "未开始录制")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
@@ -110,35 +116,6 @@ struct BroadcastScreenView: View {
                 
                 // Recording controls
                 HStack(spacing: 20) {
-                    // 暂停/恢复按钮
-                    Button(action: {
-                        if isRecording {
-                            if isPaused {
-                                resumeRecording()
-                            } else {
-                                pauseRecording()
-                            }
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: isPaused ? "play.circle.fill" : "pause.circle.fill")
-                                .font(.system(size: 22))
-                            
-                            Text(isPaused ? "恢复" : "暂停")
-                                .font(.system(size: 16, weight: .medium))
-                        }
-                        .padding(.vertical, 18)
-                        .padding(.horizontal, 20)
-                        .foregroundColor(.white)
-                        .background(
-                            RoundedRectangle(cornerRadius: 30)
-                                .fill(isPaused ? Color.blue : Color.orange)
-                        )
-                        .frame(height: 60)
-                    }
-                    .disabled(!isRecording)
-                    .opacity(isRecording ? 1.0 : 0.5)
-                    
                     // 开始/停止按钮
                     Button(action: {
                         if isRecording {
@@ -163,6 +140,29 @@ struct BroadcastScreenView: View {
                         )
                         .frame(height: 60)
                     }
+                    
+                    // 保存按钮 - 仅当有录制视频时显示
+                    if !isRecording, let _ = recordingURL {
+                        Button(action: {
+                            saveVideoToPhotoLibrary()
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.down.to.line")
+                                    .font(.system(size: 22))
+                                
+                                Text("保存视频")
+                                    .font(.system(size: 16, weight: .medium))
+                            }
+                            .padding(.vertical, 18)
+                            .padding(.horizontal, 20)
+                            .foregroundColor(.white)
+                            .background(
+                                RoundedRectangle(cornerRadius: 30)
+                                    .fill(Color.blue)
+                            )
+                            .frame(height: 60)
+                        }
+                    }
                 }
                 .padding(.top, 5)
                 .padding(.bottom, 10)
@@ -179,19 +179,49 @@ struct BroadcastScreenView: View {
                 Spacer()
             }
             .padding()
+            
+            // 保存成功提示
+            if showingSaveSuccess {
+                ZStack {
+                    Color.black.opacity(0.7)
+                        .edgesIgnoringSafeArea(.all)
+                    
+                    VStack(spacing: 20) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.green)
+                        
+                        Text("视频已保存到相册")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                    .padding(30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.white.opacity(0.15))
+                    )
+                }
+                .onAppear {
+                    // 2秒后自动关闭提示
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            showingSaveSuccess = false
+                        }
+                    }
+                }
+            }
         }
         .preferredColorScheme(.light)
-        .onChange(of: scenePhase) { newPhase in
+        .onChange(of: scenePhase) { oldPhase, newPhase in
             if newPhase == .background && isRecording && !isPaused {
                 if isRecordingInBackground {
                     // 进入后台且要求后台录制
                     beginBackgroundTask()
                     playSilentAudio() // 播放静音音频保持应用活跃
-                    scheduleBackgroundTask() // 安排后台任务
                     showBackgroundRecordingNotification()
                 } else {
-                    // 不允许后台录制，暂停录制
-                    pauseRecording()
+                    // 不允许后台录制，停止录制
+                    stopRecording()
                 }
             } else if newPhase == .active && isRecording && backgroundTaskID != .invalid {
                 // 回到前台，结束后台任务
@@ -200,14 +230,26 @@ struct BroadcastScreenView: View {
             }
         }
         .onAppear {
-            // 页面出现时自动请求权限并开始录制
+            // 页面出现时自动请求权限
+            checkScreenRecordingPermission()
             setupBackgroundTask() // 设置后台任务处理器
-            requestPermissionAndStartRecording()
+            
+            // 设置计时器，用于更新录制时间
+            timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                if self.isRecording && !self.isPaused {
+                    self.recordingTime += 1
+                }
+            }
+            timer?.fire()
         }
         .onDisappear {
-            if isRecording && !isRecordingInBackground {
+            // 页面消失时停止录制和计时器
+            if isRecording {
                 stopRecording()
             }
+            
+            timer?.invalidate()
+            timer = nil
         }
         .alert(isPresented: $showPermissionAlert) {
             Alert(
@@ -241,145 +283,184 @@ struct BroadcastScreenView: View {
     
     // MARK: - 录制功能
     
-    private func requestPermissionAndStartRecording() {
+    private func checkScreenRecordingPermission() {
         let recorder = RPScreenRecorder.shared()
         
         guard recorder.isAvailable else {
             errorMessage = "您的设备不支持屏幕录制"
             return
         }
-        
-        // 配置音频会话
-        setupAudioSession()
-        
-        // 检查是否已经在录制
-        if recorder.isRecording {
-            isRecording = true
-            return
-        }
-        
-        // 请求权限并开始录制
-        recorder.isMicrophoneEnabled = false
-        recorder.startCapture { (buffer, bufferType, error) in
-            if let error = error {
-                DispatchQueue.main.async {
-                    self.errorMessage = "录制错误: \(error.localizedDescription)"
-                    self.isRecording = false
-                }
-                return
-            }
-            
-            // 只处理视频帧
-            if bufferType == .video {
-                self.processVideoFrame(buffer)
-            }
-        } completionHandler: { (error) in
-            if let error = error {
-                DispatchQueue.main.async {
-                    if (error as NSError).code == RPRecordingErrorCode.userDeclined.rawValue {
-                        self.showPermissionAlert = true
-                    } else {
-                        self.errorMessage = "无法启动录制: \(error.localizedDescription)"
-                    }
-                    self.isRecording = false
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.isRecording = true
-                    self.isPaused = false
-                    self.recordingTime = 0
-                    self.errorMessage = nil
-                    
-                    // 开始计时器
-                    self.timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                        if !self.isPaused {
-                            self.recordingTime += 0.1
-                        }
-                    }
-                    
-                    // 确保计时器在后台也能运行
-                    RunLoop.current.add(self.timer!, forMode: .common)
-                }
-            }
-        }
     }
     
     private func startRecording() {
-        requestPermissionAndStartRecording()
-    }
-    
-    private func pauseRecording() {
-        // 暂停录制 - 注意RPScreenRecorder没有内置暂停功能，我们只是暂停计时器和UI显示
-        isPaused = true
-    }
-    
-    private func resumeRecording() {
-        // 恢复录制
+        // 创建临时文件URL用于保存录制内容
+        let tempDirectory = FileManager.default.temporaryDirectory
+        let outputURL = tempDirectory.appendingPathComponent("screen_recording_\(Date().timeIntervalSince1970).mp4")
+        
+        // 重置计时和状态
+        recordingTime = 0
         isPaused = false
-    }
-    
-    private func stopRecording() {
-        let recorder = RPScreenRecorder.shared()
         
-        // 结束后台任务(如果有)
-        if backgroundTaskID != .invalid {
-            endBackgroundTask()
-        }
-        
-        // 停止静音音频播放
-        stopSilentAudio()
-        
-        if recorder.isRecording {
-            recorder.stopCapture { (error) in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        self.errorMessage = "停止录制失败: \(error.localizedDescription)"
-                    }
-                    self.isRecording = false
-                    self.isPaused = false
-                    self.timer?.invalidate()
-                    self.timer = nil
+        // 开始录制
+        screenRecorder.startRecording(to: outputURL) { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.errorMessage = "无法开始录制: \(error.localizedDescription)"
+                    print("Failed to start recording: \(error.localizedDescription)")
+                } else {
+                    self.isRecording = true
+                    self.recordingURL = outputURL
+                    self.errorMessage = nil
+                    
+                    // 捕获一个预览图像
+                    self.capturePreviewImage()
                 }
             }
         }
     }
     
-    private func processVideoFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        
-        // 如果暂停了，不处理新帧
-        if isPaused {
+    private func stopRecording() {
+        screenRecorder.stopRecording { url, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.errorMessage = "停止录制时发生错误: \(error.localizedDescription)"
+                    print("Failed to stop recording: \(error.localizedDescription)")
+                } else if let url = url {
+                    // 录制成功，保存URL以便稍后保存
+                    self.recordingURL = url
+                    print("Recording saved to: \(url.path)")
+                }
+                
+                self.isRecording = false
+                self.isPaused = false
+            }
+        }
+    }
+    
+    private func capturePreviewImage() {
+        // 使用截图来获取预览
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                let renderer = UIGraphicsImageRenderer(bounds: window.bounds)
+                let screenshot = renderer.image { _ in
+                    window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+                }
+                self.capturedImage = screenshot
+            }
+        }
+    }
+    
+    private func saveVideoToPhotoLibrary() {
+        guard let recordingURL = recordingURL else {
+            errorMessage = "没有可保存的录制内容"
             return
         }
         
-        // 每隔一段时间更新预览图像
+        // 检查文件是否存在
+        guard FileManager.default.fileExists(atPath: recordingURL.path) else {
+            errorMessage = "录制文件不存在或已被移除"
+            return
+        }
+        
+        // 显示正在保存的提示
         DispatchQueue.main.async {
-            if Int(self.recordingTime * 10) % 20 == 0 { // 大约每2秒更新一次
-                let ciImage = CIImage(cvPixelBuffer: imageBuffer)
-                let context = CIContext()
-                if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
-                    self.capturedImage = UIImage(cgImage: cgImage)
+            self.errorMessage = "正在保存视频到相册..."
+        }
+        
+        // 请求照片库权限
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            switch status {
+            case .authorized, .limited:
+                // 保存视频到照片库
+                self.saveVideoFile(at: recordingURL)
+            case .denied, .restricted:
+                DispatchQueue.main.async {
+                    self.errorMessage = "需要访问照片库权限才能保存视频。请在设置中允许MirrorChild访问照片库。"
+                }
+            case .notDetermined:
+                // 权限状态尚未确定，这不应该发生，因为我们刚刚请求了权限
+                DispatchQueue.main.async {
+                    self.errorMessage = "无法确定照片库权限状态，请重试"
+                }
+            @unknown default:
+                DispatchQueue.main.async {
+                    self.errorMessage = "未知错误，无法保存视频"
+                }
+            }
+        }
+    }
+    
+    private func saveVideoFile(at videoURL: URL) {
+        // 创建一个临时文件拷贝，避免访问权限问题
+        let tempDir = FileManager.default.temporaryDirectory
+        let tempFileName = "temp_video_\(Date().timeIntervalSince1970).mp4"
+        let tempFileURL = tempDir.appendingPathComponent(tempFileName)
+        
+        do {
+            // 如果临时文件已存在，先删除
+            if FileManager.default.fileExists(atPath: tempFileURL.path) {
+                try FileManager.default.removeItem(at: tempFileURL)
+            }
+            
+            // 复制视频文件到临时目录
+            try FileManager.default.copyItem(at: videoURL, to: tempFileURL)
+            
+            // 在主线程更新UI并执行保存操作
+            DispatchQueue.main.async {
+                PHPhotoLibrary.shared().performChanges({
+                    // 创建视频资源
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: tempFileURL)
+                }) { success, error in
+                    // 保存完成后删除临时文件
+                    try? FileManager.default.removeItem(at: tempFileURL)
                     
-                    // 后台录制时保存截图到文件系统
-                    if self.isRecordingInBackground && !self.isPaused {
-                        self.saveScreenshotToFile(UIImage(cgImage: cgImage))
+                    DispatchQueue.main.async {
+                        if success {
+                            self.showingSaveSuccess = true
+                            self.errorMessage = nil
+                            
+                            // 2秒后恢复默认状态
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                self.errorMessage = nil
+                            }
+                        } else {
+                            if let error = error {
+                                print("保存视频错误: \(error.localizedDescription)")
+                                self.errorMessage = "保存视频失败: \(error.localizedDescription)"
+                            } else {
+                                self.errorMessage = "保存视频失败，请重试"
+                            }
+                        }
                     }
                 }
+            }
+        } catch {
+            DispatchQueue.main.async {
+                print("处理视频文件错误: \(error.localizedDescription)")
+                self.errorMessage = "处理视频文件失败: \(error.localizedDescription)"
             }
         }
     }
     
     // MARK: - 后台任务处理
     
+    private func setupBackgroundTask() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundTaskIdentifier, using: nil) { task in
+            // 这里处理后台任务
+            print("后台任务被激活")
+            task.setTaskCompleted(success: true)
+        }
+    }
+    
     private func beginBackgroundTask() {
-        // 如果已经有一个后台任务，先结束它
+        // 结束之前的后台任务（如果有）
         endBackgroundTask()
         
         // 开始一个新的后台任务
-        backgroundTaskID = UIApplication.shared.beginBackgroundTask {
-            // 后台任务即将过期的回调
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask { [self] in
+            // 这是后台任务即将过期的回调
             print("屏幕录制后台任务即将过期")
-            self.scheduleBackgroundTask() // 尝试安排新的后台任务
             self.endBackgroundTask()
         }
         
@@ -394,16 +475,9 @@ struct BroadcastScreenView: View {
         backgroundTaskID = .invalid
     }
     
-    // 设置后台任务处理器
-    private func setupBackgroundTask() {
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundTaskIdentifier, using: nil) { task in
-            self.handleBackgroundTask(task: task as! BGProcessingTask)
-        }
-    }
-    
-    // 安排后台任务
     private func scheduleBackgroundTask() {
         let request = BGProcessingTaskRequest(identifier: backgroundTaskIdentifier)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 60) // 60秒后可以开始执行
         request.requiresNetworkConnectivity = false
         request.requiresExternalPower = false
         
@@ -415,118 +489,48 @@ struct BroadcastScreenView: View {
         }
     }
     
-    // 处理后台任务
-    private func handleBackgroundTask(task: BGProcessingTask) {
-        // 确保任务完成前不会被系统终止
-        task.expirationHandler = {
-            print("后台任务即将过期")
-            task.setTaskCompleted(success: false)
-        }
-        
-        // 如果我们正在录制，并且处于后台，则保持活跃并捕获更多帧
-        if isRecording && !isPaused && isRecordingInBackground {
-            print("后台任务执行中 - 继续录制")
-            task.setTaskCompleted(success: true)
-            
-            // 再次安排后台任务
-            scheduleBackgroundTask()
-        } else {
-            task.setTaskCompleted(success: true)
-        }
-    }
+    // MARK: - 后台播放静音音频以保持应用活跃
     
-    // 配置音频会话以支持后台播放
-    private func setupAudioSession() {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            print("设置音频会话失败: \(error)")
-        }
-    }
-    
-    // 播放静音音频以保持应用在后台活跃
     private func playSilentAudio() {
         guard audioPlayer == nil else { return }
         
-        // 如果没有找到静音音频文件，就直接创建内存音频
-        createSilentAudio()
-    }
-    
-    // 创建内存中的静音音频（如果资源文件不可用）
-    private func createSilentAudio() {
-        // 创建5秒静音PCM数据
-        let sampleRate = 8000
-        let duration = 5.0
-        let samples = Int(duration * Double(sampleRate))
-        let buffer = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: Double(sampleRate), channels: 1)!, frameCapacity: AVAudioFrameCount(samples))
+        // 尝试加载静音音频文件
+        guard let audioFileURL = Bundle.main.url(forResource: "silence", withExtension: "mp3") else {
+            print("找不到静音音频文件")
+            return
+        }
         
-        if let channelData = buffer?.floatChannelData {
-            // 填充静音数据
-            for i in 0..<Int(buffer!.frameCapacity) {
-                channelData[0][i] = 0.0
-            }
-            buffer?.frameLength = buffer!.frameCapacity
+        do {
+            // 配置音频会话
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
             
-            // 创建播放器
-            do {
-                // 旧版iOS使用这种初始化方式
-                if #available(iOS 15.0, *) {
-                    let player = try AVAudioPlayer(audioFormat: buffer!.format, buffer: buffer!)
-                    player.numberOfLoops = -1 // 无限循环
-                    player.volume = 0.01
-                    player.prepareToPlay()
-                    player.play()
-                    self.audioPlayer = player
-                } else {
-                    // iOS 15之前需要将PCM数据转换为Data
-                    let audioFormat = buffer!.format
-                    let audioBuffer = buffer!
-                
-                    
-                    // 创建Data包装PCM数据
-                    let channelCount = Int(audioFormat.channelCount)
-                    let frameLength = Int(audioBuffer.frameLength)
-                    let bytesPerFrame = audioFormat.streamDescription.pointee.mBytesPerFrame
-                    let dataSize = frameLength * Int(bytesPerFrame)
-                    var audioData = Data(count: dataSize)
-                    
-                    // 将PCM数据复制到Data中
-                    audioData.withUnsafeMutableBytes { ptr in
-                        for channel in 0..<channelCount {
-                            let channelData = audioBuffer.floatChannelData![channel]
-                            for frame in 0..<frameLength {
-                                // 简单地将浮点样本转换为16位PCM
-                                let offset = frame * channelCount + channel
-                                let sample = Int16(channelData[frame] * 32767.0)
-                                ptr.storeBytes(of: sample, toByteOffset: offset * 2, as: Int16.self)
-                            }
-                        }
-                    }
-                    
-                    // 使用Data创建AVAudioPlayer
-                    let player = try AVAudioPlayer(data: audioData)
-                    player.numberOfLoops = -1
-                    player.volume = 0.01
-                    player.prepareToPlay()
-                    player.play()
-                    self.audioPlayer = player
-                }
-                
-                print("开始播放内存生成的静音音频")
-            } catch {
-                print("创建静音音频播放器失败: \(error)")
-            }
+            // 创建音频播放器
+            audioPlayer = try AVAudioPlayer(contentsOf: audioFileURL)
+            audioPlayer?.numberOfLoops = -1 // 无限循环
+            audioPlayer?.volume = 0.01 // 几乎无声
+            audioPlayer?.play()
+            
+            print("开始播放静音音频以保持后台活跃")
+        } catch {
+            print("无法配置音频播放: \(error)")
         }
     }
     
-    // 停止播放静音音频
     private func stopSilentAudio() {
         audioPlayer?.stop()
         audioPlayer = nil
+        
+        // 恢复音频会话
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("无法重置音频会话: \(error)")
+        }
     }
     
-    // 显示后台录制通知
+    // MARK: - 后台通知
+    
     private func showBackgroundRecordingNotification() {
         let content = UNMutableNotificationContent()
         content.title = "屏幕录制进行中"
@@ -544,34 +548,17 @@ struct BroadcastScreenView: View {
         }
     }
     
-    // 保存截图到文件系统
-    private func saveScreenshotToFile(_ image: UIImage) {
-        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return
-        }
-        
-        // 创建截图目录
-        let screenshotsDirectory = documentsDirectory.appendingPathComponent("Screenshots")
-        if !FileManager.default.fileExists(atPath: screenshotsDirectory.path) {
-            try? FileManager.default.createDirectory(at: screenshotsDirectory, withIntermediateDirectories: true)
-        }
-        
-        // 创建文件名：timestamp.jpg
-        let timestamp = Date().timeIntervalSince1970
-        let fileName = "\(Int(timestamp)).jpg"
-        let fileURL = screenshotsDirectory.appendingPathComponent(fileName)
-        
-        // 保存图像
-        if let data = image.jpegData(compressionQuality: 0.8) {
-            try? data.write(to: fileURL)
-            print("保存截图到: \(fileURL.path)")
-        }
-    }
+    // MARK: - 辅助函数
     
     private func formatTime(_ timeInterval: TimeInterval) -> String {
-        let minutes = Int(timeInterval) / 60
+        let hours = Int(timeInterval) / 3600
+        let minutes = Int(timeInterval) / 60 % 60
         let seconds = Int(timeInterval) % 60
-        let tenths = Int((timeInterval - Double(Int(timeInterval))) * 10)
-        return String(format: "%02d:%02d.%d", minutes, seconds, tenths)
+        
+        if hours > 0 {
+            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            return String(format: "%02d:%02d", minutes, seconds)
+        }
     }
-}
+} 

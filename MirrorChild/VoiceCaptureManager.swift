@@ -209,6 +209,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         case notDetermined, denied, authorized
     }
     
+    // 添加一个标记来跟踪后台任务的状态
+    private var voiceBackgroundTaskId: UIBackgroundTaskIdentifier = .invalid
+    
     // 初始化
     private override init() {
         super.init()
@@ -272,22 +275,17 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     
     // 开始后台任务
     private func beginBackgroundTask() {
-        guard !isRunningInPreview else { return }
-        
-        // 结束之前的后台任务（如果有）
+        // 如果已经有一个活跃的后台任务，先结束它
         endBackgroundTask()
         
         // 开始一个新的后台任务
-        backgroundTask = UIApplication.shared.beginBackgroundTask { [weak self] in
+        voiceBackgroundTaskId = UIApplication.shared.beginBackgroundTask { [weak self] in
             // 这是后台任务即将过期的回调
-            print("后台任务即将过期")
+            print("语音录制后台任务即将过期")
             self?.endBackgroundTask()
         }
         
-        print("已开始后台任务，ID: \(backgroundTask)")
-        
-        // 显示一个本地通知，告知用户应用在后台录音
-        showBackgroundRecordingNotification()
+        print("已开始语音录制后台任务，ID: \(voiceBackgroundTaskId)")
     }
     
     // 显示后台录音通知
@@ -310,11 +308,11 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     
     // 结束后台任务
     private func endBackgroundTask() {
-        guard !isRunningInPreview, backgroundTask != .invalid else { return }
+        guard voiceBackgroundTaskId != .invalid else { return }
         
-        print("结束后台任务，ID: \(backgroundTask)")
-        UIApplication.shared.endBackgroundTask(backgroundTask)
-        backgroundTask = .invalid
+        print("结束语音录制后台任务，ID: \(voiceBackgroundTaskId)")
+        UIApplication.shared.endBackgroundTask(voiceBackgroundTaskId)
+        voiceBackgroundTaskId = .invalid
     }
     
     // 更新语音识别器
@@ -803,6 +801,11 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             do {
                 try audioEngine.start()
                 self.isRecording = true
+                self.error = nil
+                
+                // 发送已开始录音的通知
+                NotificationCenter.default.post(name: .didStartRecording, object: nil)
+                
                 print("音频引擎启动成功，录音开始")
                 self.audioSessionLock.unlock()
                 completion(true, nil)
@@ -832,8 +835,13 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         // 在预览模式下简单切换状态，无需处理实际资源
         if isRunningInPreview {
             self.isRecording = false
+            // 发送已停止录音的通知
+            NotificationCenter.default.post(name: .didStopRecording, object: nil)
             return
         }
+        
+        // 确保结束后台任务
+        endBackgroundTask()
         
         // 使用互斥锁保护音频会话释放过程
         audioSessionLock.lock()
@@ -854,9 +862,6 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             print("音频引擎已停止")
         }
         
-        // 停止背景任务
-        endBackgroundTask()
-        
         // 重置音频会话
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -873,6 +878,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
         
         // 清除错误
         self.error = nil
+        
+        // 发送已停止录音的通知
+        NotificationCenter.default.post(name: .didStopRecording, object: nil)
     }
     
     // 重置录音状态
