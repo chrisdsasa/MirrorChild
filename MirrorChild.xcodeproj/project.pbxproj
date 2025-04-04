@@ -10,9 +10,22 @@
 		6A359A5D2D9EBB6700E8BAC4 /* MirrorChild.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MirrorChild.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A15FD6B32D9F64B800C95ADA /* Exceptions for "MirrorChild" folder in "MirrorChild" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6A359A5C2D9EBB6700E8BAC4 /* MirrorChild */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		6A359A5F2D9EBB6700E8BAC4 /* MirrorChild */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A15FD6B32D9F64B800C95ADA /* Exceptions for "MirrorChild" folder in "MirrorChild" target */,
+			);
 			path = MirrorChild;
 			sourceTree = "<group>";
 		};
@@ -78,7 +91,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
-				LastUpgradeCheck = 1620;
+				LastUpgradeCheck = 1630;
 				TargetAttributes = {
 					6A359A5C2D9EBB6700E8BAC4 = {
 						CreatedOnToolsVersion = 16.2;
@@ -131,6 +144,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -161,6 +175,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 6NMN2A89PD;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -194,6 +209,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -224,6 +240,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 6NMN2A89PD;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -253,15 +270,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"MirrorChild/Preview Content\"";
-				DEVELOPMENT_TEAM = 6NMN2A89PD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MirrorChild/Info.plist;
 				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
 				INFOPLIST_KEY_CFBundleLocalizations = "en ja";
 				INFOPLIST_KEY_NSCameraUsageDescription = "MirrorChild needs access to your camera to assist with device problems.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MirrorChild needs access to your microphone to provide voice assistance.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MirrorChild需要麦克风访问权限以听取您的声音并提供帮助";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "MirrorChild needs access to save screenshots during screen sharing.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MirrorChild needs access to your photo library for screen sharing functionality.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "MirrorChild需要语音识别以理解您的请求";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -288,15 +307,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"MirrorChild/Preview Content\"";
-				DEVELOPMENT_TEAM = 6NMN2A89PD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MirrorChild/Info.plist;
 				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
 				INFOPLIST_KEY_CFBundleLocalizations = "en ja";
 				INFOPLIST_KEY_NSCameraUsageDescription = "MirrorChild needs access to your camera to assist with device problems.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MirrorChild needs access to your microphone to provide voice assistance.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MirrorChild需要麦克风访问权限以听取您的声音并提供帮助";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "MirrorChild needs access to save screenshots during screen sharing.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MirrorChild needs access to your photo library for screen sharing functionality.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "MirrorChild需要语音识别以理解您的请求";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
