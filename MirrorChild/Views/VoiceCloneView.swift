@@ -205,7 +205,7 @@ struct VoiceCloneView: View {
             
             Text("准备录音")
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundColor(.primary)
+                .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
             
             Text("点击下方按钮开始录制你的声音")
                 .font(.system(size: 15, design: .rounded))

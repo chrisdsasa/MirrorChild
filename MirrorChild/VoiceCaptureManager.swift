@@ -728,7 +728,7 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 return
             }
             
-            // 安装音频输入节点
+            // 获取输入节点和格式
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
             
@@ -741,6 +741,21 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                 if #available(iOS 16.0, *) {
                     recognitionRequest.addsPunctuation = true
                 }
+            }
+            
+            print("开始录音，使用格式：\(recordingFormat)")
+            
+            // 使用兼容的音频格式，解决"Input HW format and tap format not matching"错误
+            let compatibleFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: recordingFormat.sampleRate,
+                channels: recordingFormat.channelCount,
+                interleaved: false
+            )
+            
+            // 安装tap以捕获音频
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: compatibleFormat ?? recordingFormat) { [weak self] buffer, when in
+                self?.recognitionRequest?.append(buffer)
             }
             
             // 创建识别任务
@@ -786,12 +801,6 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                     // 创建新的识别请求以继续录音
                     self.restartSpeechRecognition()
                 }
-            }
-            
-            // 配置音频输入
-            // 将音频输入连接到请求
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, when in
-                self?.recognitionRequest?.append(buffer)
             }
             
             // 启动音频引擎
@@ -1491,9 +1500,17 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
             
+            // 使用兼容的音频格式，解决"Input HW format and tap format not matching"错误
+            let compatibleFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: recordingFormat.sampleRate,
+                channels: recordingFormat.channelCount,
+                interleaved: false
+            )
+            
             // 注意：需要先移除旧的tap，再安装新的tap
             inputNode.removeTap(onBus: 0)
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, when in
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: compatibleFormat ?? recordingFormat) { [weak self] buffer, when in
                 self?.recognitionRequest?.append(buffer)
             }
         }

@@ -30,12 +30,12 @@ extension Color {
 
 // 应用颜色 - 定义全局颜色常量供全应用使用
 extension Color {
-    static let accentRebeccaPurple = Color(hex: "663399") // Rebecca Purple
-    static let surfaceThistle = Color(hex: "D8BFD8") // Thistle
+    static let accentGreen = Color(hex: "749474") // Green accent
+    static let surfaceLightGreen = Color(hex: "A9C2A9") // Light green surface
     
     // Theme colors
-    static let backgroundPrimary = surfaceThistle.opacity(0.2)
-    static let backgroundSecondary = surfaceThistle.opacity(0.1)
-    static let accentLight = accentRebeccaPurple.opacity(0.5)
-    static let accentDark = accentRebeccaPurple.opacity(0.8)
+    static let backgroundPrimary = surfaceLightGreen.opacity(0.2)
+    static let backgroundSecondary = surfaceLightGreen.opacity(0.1)
+    static let accentLight = accentGreen.opacity(0.5)
+    static let accentDark = accentGreen.opacity(0.8)
 } 

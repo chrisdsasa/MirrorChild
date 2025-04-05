@@ -103,6 +103,9 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
         case notDetermined, denied, authorized
     }
     
+    // 添加新属性来跟踪上次捕获时间
+    private var lastCaptureTime = Date(timeIntervalSince1970: 0)
+    
     override init() {
         super.init()
         
@@ -408,62 +411,58 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
         frameProcessingQueue.async { [weak self] in
             guard let self = self else { return }
             
-            // 转换CMSampleBuffer为UIImage，增加错误处理
+            // 转换CMSampleBuffer为UIImage
             let ciImage = CIImage(cvPixelBuffer: imageBuffer)
             let context = CIContext()
             
-            do {
-                guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
-                    print("无法从CIImage创建CGImage")
-                    return
+            guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
+                print("无法从CIImage创建CGImage")
+                return
+            }
+            
+            // 创建UIImage并确保尺寸合理
+            let originalImage = UIImage(cgImage: cgImage)
+            
+            // 验证图像尺寸
+            guard originalImage.size.width > 0, originalImage.size.height > 0,
+                  originalImage.size.width.isFinite, originalImage.size.height.isFinite else {
+                print("警告: 原始图像尺寸无效: \(originalImage.size)")
+                return
+            }
+            
+            // 缩小图像以节省内存，这里会执行额外的尺寸验证
+            let uiImage = originalImage.scaledForPreview()
+            
+            // 只对部分帧进行存储（例如每秒一帧）以节省空间
+            if self.shouldStoreThisFrame() {
+                // 创建已捕获的帧对象
+                let frame = CapturedFrame(
+                    timestamp: Date(),
+                    image: uiImage,
+                    transcribedText: nil, // 后续与语音识别文本关联
+                    sessionId: self.currentSessionId
+                )
+                
+                // 保存帧到文件系统
+                if let directory = self.captureSessionDirectory {
+                    _ = frame.saveToFile(in: directory)
                 }
                 
-                // 创建UIImage并确保尺寸合理
-                let originalImage = UIImage(cgImage: cgImage)
-                
-                // 验证图像尺寸
-                guard originalImage.size.width > 0, originalImage.size.height > 0,
-                      originalImage.size.width.isFinite, originalImage.size.height.isFinite else {
-                    print("警告: 原始图像尺寸无效: \(originalImage.size)")
-                    return
-                }
-                
-                // 缩小图像以节省内存，这里会执行额外的尺寸验证
-                let uiImage = originalImage.scaledForPreview()
-                
-                // 只对部分帧进行存储（例如每秒一帧）以节省空间
-                if self.shouldStoreThisFrame() {
-                    // 创建已捕获的帧对象
-                    let frame = CapturedFrame(
-                        timestamp: Date(),
-                        image: uiImage,
-                        transcribedText: nil, // 后续与语音识别文本关联
-                        sessionId: self.currentSessionId
-                    )
+                // 添加到内存中的帧缓存
+                DispatchQueue.main.async {
+                    self.capturedFrames.append(frame)
                     
-                    // 保存帧到文件系统
-                    if let directory = self.captureSessionDirectory {
-                        _ = frame.saveToFile(in: directory)
+                    // 如果超出最大存储量，移除最旧的帧
+                    if self.capturedFrames.count > self.maxStoredFrames {
+                        self.capturedFrames.removeFirst()
                     }
                     
-                    // 添加到内存中的帧缓存
-                    DispatchQueue.main.async {
-                        self.capturedFrames.append(frame)
-                        
-                        // 如果超出最大存储量，移除最旧的帧
-                        if self.capturedFrames.count > self.maxStoredFrames {
-                            self.capturedFrames.removeFirst()
-                        }
-                        
-                        // 更新预览帧（仅保留几帧用于UI展示）
-                        if self.previewFrames.count >= self.maxFrameCount {
-                            self.previewFrames.remove(at: 0)
-                        }
-                        self.previewFrames.append(uiImage)
+                    // 更新预览帧（仅保留几帧用于UI展示）
+                    if self.previewFrames.count >= self.maxFrameCount {
+                        self.previewFrames.remove(at: 0)
                     }
+                    self.previewFrames.append(uiImage)
                 }
-            } catch {
-                print("处理视频帧时出错: \(error.localizedDescription)")
             }
         }
     }
@@ -472,7 +471,6 @@ class ScreenCaptureManager: NSObject, ObservableObject, RPScreenRecorderDelegate
     private func shouldStoreThisFrame() -> Bool {
         // 简单实现：根据时间戳确定存储频率（例如每秒存储一帧）
         // 这可以根据需要调整
-        var lastCaptureTime = Date(timeIntervalSince1970: 0)
         
         let now = Date()
         let timeSinceLastCapture = now.timeIntervalSince(lastCaptureTime)

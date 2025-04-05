@@ -99,7 +99,7 @@ struct ScreenCaptureView: View {
                                 .padding(.horizontal, 30)
                                 .background(
                                     Capsule()
-                                        .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                                        .fill(Color(red: 0.455, green: 0.580, blue: 0.455))
                                 )
                                 .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
                         }
@@ -114,7 +114,7 @@ struct ScreenCaptureView: View {
                     }) {
                         Text("openSettings".localized)
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                             .padding(.top, 10)
                     }
                 }
@@ -199,7 +199,7 @@ struct ScreenCaptureView: View {
         VStack(spacing: 16) {
             Image(systemName: "display")
                 .font(.system(size: 60))
-                .foregroundColor(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.5))
+                .foregroundColor(Color(red: 0.7, green: 0.8, blue: 0.7).opacity(0.5))
             
             if screenCaptureManager.permissionStatus == .denied {
                 Text("permissionDeniedMessage".localized)
