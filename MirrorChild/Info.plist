@@ -86,5 +86,11 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>name.KrypotoZ.MirrorChild.backgroundProcessing</string>
+		<string>name.KrypotoZ.MirrorChild.backgroundRefresh</string>
+		<string>name.KrypotoZ.MirrorChild.audioProcessing</string>
+	</array>
 </dict>
 </plist>
