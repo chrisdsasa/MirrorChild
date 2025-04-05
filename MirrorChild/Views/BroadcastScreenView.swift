@@ -5,7 +5,6 @@ import AVKit
 struct BroadcastScreenView: View {
     @StateObject private var broadcastManager = BroadcastManager.shared
     @State private var selectedFrameIndex: Int? = nil
-    @State private var showGuide = false
     @State private var showVideoPlayer = false
     @State private var selectedVideo: RecordedVideo? = nil
     @State private var showSaveSuccess = false
@@ -76,37 +75,15 @@ struct BroadcastScreenView: View {
                 )
                 .padding(.horizontal, 20)
                 
-                // Help button
-                Button(action: {
-                    showGuide.toggle()
-                }) {
-                    Label("如何使用", systemImage: "questionmark.circle")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.8))
-                }
-                .padding(.top, 5)
-                
                 // Broadcast picker - production-ready implementation
-                VStack {
-                    Text("点击下方按钮开始/停止录制")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
-                        .padding(.bottom, 5)
-                    
-                    BroadcastPickerRepresentable()
-                        .frame(width: 200, height: 60)
-                }
-                .padding(.top, 10)
-                .padding(.bottom, 10)
+                BroadcastPickerRepresentable()
+                    .frame(width: 240, height: 60)
+                    .padding(.top, 20)
+                    .padding(.bottom, 20)
                 
                 Spacer()
             }
             .padding()
-            
-            // Guide overlay
-            if showGuide {
-                guideOverlay
-            }
             
             // Video player sheet
             if showVideoPlayer, let video = selectedVideo {
@@ -241,7 +218,7 @@ struct BroadcastScreenView: View {
                     saveVideoToPhotos(video: video)
                 }) {
                     Image(systemName: "square.and.arrow.down")
-                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.8))
+                        .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                 }
                 
                 Button(action: {
@@ -305,7 +282,7 @@ struct BroadcastScreenView: View {
                         }
                         .padding(.vertical, 12)
                         .padding(.horizontal, 20)
-                        .background(Color(red: 0.3, green: 0.3, blue: 0.8))
+                        .background(Color(red: 0.455, green: 0.580, blue: 0.455))
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
@@ -397,20 +374,13 @@ struct BroadcastScreenView: View {
         VStack(spacing: 16) {
             Image(systemName: "display")
                 .font(.system(size: 60))
-                .foregroundColor(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.5))
+                .foregroundColor(Color(red: 0.7, green: 0.8, blue: 0.7).opacity(0.5))
             
             Text("tapToBroadcast".localized)
                 .font(.system(size: 18, weight: .medium))
                 .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            
-            Text("点击下方的按钮即可开始录制其他应用的屏幕。\n如系统提示，请选择要录制的应用。")
-                .font(.system(size: 14))
-                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.7))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 30)
-                .padding(.top, 20)
         }
     }
     
@@ -435,69 +405,6 @@ struct BroadcastScreenView: View {
                     .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
             )
             .padding(.bottom, 40)
-        }
-    }
-    
-    // 使用指南弹窗
-    private var guideOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    showGuide = false
-                }
-            
-            VStack(alignment: .leading, spacing: 20) {
-                Text("屏幕录制使用指南")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.8))
-                    .padding(.bottom, 5)
-                
-                Group {
-                    guideItem(number: "1", text: "点击下方蓝色按钮开始录制")
-                    guideItem(number: "2", text: "在系统弹出的选择器中选择要录制的应用")
-                    guideItem(number: "3", text: "录制开始后，可以切换到目标应用进行操作")
-                    guideItem(number: "4", text: "录制过程中，您可以随时返回本应用查看录制状态")
-                    guideItem(number: "5", text: "完成后，再次点击录制按钮停止录制")
-                    guideItem(number: "6", text: "录制完成后，可以查看、保存或分享录制的视频")
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    showGuide = false
-                }) {
-                    Text("我知道了")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color(red: 0.3, green: 0.3, blue: 0.8))
-                        .cornerRadius(10)
-                }
-            }
-            .padding(25)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white)
-            )
-            .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
-            .padding(.horizontal, 30)
-        }
-    }
-    
-    // 指南中的单个条目
-    private func guideItem(number: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 15) {
-            Text(number)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 26, height: 26)
-                .background(Circle().fill(Color(red: 0.3, green: 0.3, blue: 0.8)))
-            
-            Text(text)
-                .font(.system(size: 16))
-                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.4))
         }
     }
     
@@ -532,11 +439,14 @@ struct BroadcastPickerRepresentable: UIViewRepresentable {
         // 自定义按钮外观
         for subview in pickerView.subviews {
             if let button = subview as? UIButton {
-                button.backgroundColor = UIColor(red: 0.3, green: 0.3, blue: 0.8, alpha: 1.0)
+                button.backgroundColor = UIColor(red: 0.455, green: 0.580, blue: 0.455, alpha: 1.0)
                 button.tintColor = .white
-                button.setTitle("开始/停止录制", for: .normal)
+                button.setTitle("   开始/停止录制", for: .normal)
+                button.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .medium)
+                button.titleLabel?.textAlignment = .center
+                button.contentVerticalAlignment = .center
                 button.layer.cornerRadius = 30
-                button.frame = CGRect(x: 0, y: 0, width: 200, height: 60)
+                button.frame = CGRect(x: 0, y: 0, width: 240, height: 60)
             }
         }
         

@@ -281,23 +281,6 @@ struct SimpleOnboardingView: View {
                 print("引导页面已关闭")
             }
             
-            // Cherry blossom decorative elements
-            GeometryReader { geometry in
-                ZStack {
-                    // Top right cherry blossom
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor(Color.pink.opacity(0.3))
-                        .position(x: geometry.size.width - 40, y: 60)
-                    
-                    // Bottom left cherry blossom
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(Color.pink.opacity(0.2))
-                        .position(x: 30, y: geometry.size.height - 100)
-                }
-            }
-            
             VStack(spacing: 30) {
                 // Japanese-style welcome header
                 HStack {
@@ -312,13 +295,13 @@ struct SimpleOnboardingView: View {
                         Text("appTitle".localized)
                             .font(.system(size: 60, weight: .heavy))
                             .tracking(2)
-                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.5))
+                            .foregroundColor(Color.black)
                             .padding(.bottom, 12)
                         
                         Text("MirrorChild")
                             .font(.custom("SF Compact Display", size: 26, relativeTo: .title).weight(.bold))
                             .tracking(1)
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                            .foregroundColor(Color.black)
                             .padding(.top, 5)
                     }
                     .frame(maxWidth: .infinity)
@@ -352,7 +335,7 @@ struct SimpleOnboardingView: View {
                     Image(systemName: "person.fill")
                         .resizable()
                         .scaledToFit()
-                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                        .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                         .frame(width: 70, height: 70)
                 }
                 .padding(.bottom, 10)
@@ -364,7 +347,7 @@ struct SimpleOnboardingView: View {
                         // Feature item
                         HStack(spacing: 15) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                .foregroundColor(Color(red: 0.5, green: 0.65, blue: 0.5))
                                 .font(.system(size: 24, weight: .light))
                             Text("feature1".localized)
                                 .font(.system(size: 20, weight: .bold))
@@ -376,7 +359,7 @@ struct SimpleOnboardingView: View {
                         // Feature item
                         HStack(spacing: 15) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                .foregroundColor(Color(red: 0.5, green: 0.65, blue: 0.5))
                                 .font(.system(size: 24, weight: .light))
                             Text("feature2".localized)
                                 .font(.system(size: 20, weight: .bold))
@@ -388,7 +371,7 @@ struct SimpleOnboardingView: View {
                         // Feature item
                         HStack(spacing: 15) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.8))
+                                .foregroundColor(Color(red: 0.5, green: 0.65, blue: 0.5))
                                 .font(.system(size: 24, weight: .light))
                             Text("feature3".localized)
                                 .font(.system(size: 20, weight: .bold))
@@ -423,13 +406,13 @@ struct SimpleOnboardingView: View {
                 }) {
                     HStack {
                         Text("startButton".localized)
-                            .font(.system(size: 20, weight: .medium))
+                            .font(.system(size: 20, weight: .bold))
                             .tracking(4)
                             .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                         
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                     }
                     .padding(.vertical, 14)
                     .padding(.horizontal, 40)

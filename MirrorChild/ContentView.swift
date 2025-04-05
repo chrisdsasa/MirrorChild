@@ -47,21 +47,9 @@ struct ContentView: View {
                 print("背景视图已加载")
             }
             
-            // Cherry blossom decorative elements (subtle)
+            // 移除了装饰元素
             GeometryReader { geometry in
                 ZStack {
-                    // Top right cherry blossom
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor(Color.pink.opacity(0.3))
-                        .position(x: geometry.size.width - 40, y: 60)
-                    
-                    // Bottom left cherry blossom
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(Color.pink.opacity(0.2))
-                        .position(x: 30, y: geometry.size.height - 100)
-                    
                     // Fixed position avatar in the center
                     ZStack {
                         // Animation indicators (positioned behind the main avatar)
@@ -122,8 +110,8 @@ struct ContentView: View {
                                         .stroke(
                                             LinearGradient(
                                                 gradient: Gradient(colors: [
-                                                    Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.4),
-                                                    Color(red: 0.8, green: 0.7, blue: 0.9).opacity(0.4)
+                                                    Color(red: 0.5, green: 0.65, blue: 0.5).opacity(0.4),
+                                                    Color(red: 0.6, green: 0.75, blue: 0.6).opacity(0.4)
                                                 ]),
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
@@ -137,7 +125,7 @@ struct ContentView: View {
                             Image(systemName: "person.fill")
                                 .resizable()
                                 .scaledToFit()
-                                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                                .foregroundColor(Color(red: 0.4, green: 0.55, blue: 0.4))
                                 .frame(width: 70, height: 70)
                                 .offset(y: -6)
                         }
@@ -153,33 +141,33 @@ struct ContentView: View {
                         // Multiple shadow layers for ultra-bold effect
                         Text("appTitle".localized)
                             .font(.custom("PingFang SC", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            .foregroundColor(Color.black)
                             .offset(x: 0.7, y: 0.7)
                         
                         Text("appTitle".localized)
                             .font(.custom("PingFang SC", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            .foregroundColor(Color.black)
                             .offset(x: 0.7, y: 0)
                         
                         Text("appTitle".localized)
                             .font(.custom("PingFang SC", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            .foregroundColor(Color.black)
                             .offset(x: 0, y: 0.7)
                             
                         Text("appTitle".localized)
                             .font(.custom("PingFang SC", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            .foregroundColor(Color.black)
                             .offset(x: -0.7, y: 0)
                             
                         Text("appTitle".localized)
                             .font(.custom("PingFang SC", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            .foregroundColor(Color.black)
                             .offset(x: 0, y: -0.7)
                             
                         // Main text (center)
                         Text("appTitle".localized)
                             .font(.custom("PingFang SC", size: 40).weight(.black))
-                            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                            .foregroundColor(Color.black)
                     }
                     .padding(.leading)
                     
@@ -197,7 +185,7 @@ struct ContentView: View {
                             
                             Image(systemName: "gearshape.fill")
                                 .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
+                                .foregroundColor(Color(red: 0.4, green: 0.55, blue: 0.4))
                         }
                     }
                     .accessibilityLabel("settingsButton".localized)
@@ -253,12 +241,12 @@ struct ContentView: View {
                                 Image(systemName: "mic.fill")
                                     .font(.system(size: 30, weight: .semibold))
                                     .foregroundColor(isMicrophoneActive ? 
-                                                   Color(red: 0.4, green: 0.4, blue: 0.7) : 
-                                                   Color(red: 0.5, green: 0.5, blue: 0.7))
+                                                   Color(red: 0.4, green: 0.55, blue: 0.4) : 
+                                                   Color(red: 0.5, green: 0.6, blue: 0.5))
                             }
                             
                             Text("voiceButtonLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 30, weight: .bold))
                                 .tracking(1)
                                 .foregroundColor(isMicrophoneActive ? 
                                                Color(red: 0.4, green: 0.4, blue: 0.6) : 
@@ -284,14 +272,14 @@ struct ContentView: View {
                                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                                 
                                 Image(systemName: "rectangle.on.rectangle.fill")
-                                    .font(.system(size: 26, weight: .semibold))
+                                    .font(.system(size: 24, weight: .semibold))
                                     .foregroundColor(isScreenSharingActive ? 
-                                                  Color(red: 0.4, green: 0.6, blue: 0.4) : 
-                                                  Color(red: 0.5, green: 0.5, blue: 0.7))
+                                                  Color(red: 0.455, green: 0.580, blue: 0.455) : 
+                                                  Color(red: 0.455, green: 0.580, blue: 0.455))
                             }
                             
                             Text("screenButtonLabel".localized)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 30, weight: .bold))
                                 .tracking(1)
                                 .foregroundColor(isScreenSharingActive ? 
                                                Color(red: 0.3, green: 0.5, blue: 0.3) : 
@@ -505,37 +493,10 @@ struct JapaneseStyleSettingsView: View {
                     // 内容区域
                     ScrollView {
                         VStack(spacing: 30) {
-                            // Voice selection
-                            VStack(alignment: .leading, spacing: 15) {
-                                Text("voiceTypeLabel".localized)
-                                    .font(.system(size: 20, weight: .bold))
-                                    .tracking(1)
-                                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                                    .padding(.leading, 10)
-                                
-                                Picker("Voice Type", selection: $selectedVoice) {
-                                    ForEach(availableVoices, id: \.self) { voice in
-                                        Text(voice.capitalized)
-                                            .font(.system(size: 18, weight: .regular))
-                                            .tag(voice)
-                                    }
-                                }
-                                .pickerStyle(.wheel)
-                                .frame(height: 120)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                                )
-                                .padding(.horizontal, 10)
-                            }
-                            .padding(.vertical, 5)
-                            .padding(.horizontal, 15)
-                            
                             // Voice Profile Section
                             VStack(alignment: .leading, spacing: 15) {
                                 Text("voiceProfileLabel".localized)
-                                    .font(.system(size: 20, weight: .bold))
+                                    .font(.system(size: 26, weight: .bold))
                                     .tracking(1)
                                     .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                     .padding(.leading, 10)
@@ -549,17 +510,17 @@ struct JapaneseStyleSettingsView: View {
                                 }) {
                                     HStack {
                                         Text("customizeVoiceButton".localized)
-                                            .font(.system(size: 18, weight: .regular))
+                                            .font(.system(size: 22, weight: .regular))
                                             .tracking(0.5)
-                                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.6))
+                                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                                         
                                         Spacer()
                                         
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 20, weight: .semibold))
-                                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
+                                            .font(.system(size: 24, weight: .semibold))
+                                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                                     }
-                                    .padding(.vertical, 15)
+                                    .padding(.vertical, 20)
                                     .padding(.horizontal, 20)
                                     .background(
                                         RoundedRectangle(cornerRadius: 12)
@@ -572,69 +533,60 @@ struct JapaneseStyleSettingsView: View {
                             .padding(.vertical, 5)
                             .padding(.horizontal, 15)
                             
-                            // Assistant traits - 修改为单选
-                            VStack(alignment: .leading, spacing: 15) {
-                                Text("assistantPersonalityLabel".localized)
-                                    .font(.system(size: 20, weight: .bold))
-                                    .tracking(1)
-                                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                                    .padding(.leading, 10)
-                                
-                                VStack(spacing: 0) {
-                                    ForEach(personalityTraits, id: \.self) { trait in
-                                        Button(action: {
-                                            // 点击时更新选中的特质
-                                            selectedPersonalityTrait = trait
-                                        }) {
-                                            HStack {
-                                                Text(trait)
-                                                    .font(.system(size: 18, weight: .regular))
-                                                    .tracking(0.5)
-                                                    .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-                                                Spacer()
-                                                // 仅当当前特质被选中时显示勾选图标
-                                                if selectedPersonalityTrait == trait {
-                                                    Image(systemName: "checkmark.circle.fill")
-                                                        .font(.system(size: 20, weight: .semibold))
-                                                        .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.7))
-                                                }
-                                            }
-                                            .padding(.vertical, 15)
-                                            .padding(.horizontal, 15)
-                                            .frame(height: 52)
-                                        }
-                                        
-                                        if trait != personalityTraits.last {
-                                            Divider()
-                                                .background(Color(red: 0.9, green: 0.9, blue: 0.95))
-                                                .padding(.leading, 15)
-                                        }
-                                    }
-                                }
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-                                )
-                                .padding(.horizontal, 10)
-                            }
-                            .padding(.vertical, 5)
-                            .padding(.horizontal, 15)
-                            
                             // About section
                             VStack(alignment: .leading, spacing: 15) {
                                 Text("aboutAppLabel".localized)
-                                    .font(.system(size: 20, weight: .bold))
+                                    .font(.system(size: 24, weight: .bold))
                                     .tracking(1)
                                     .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
                                     .padding(.leading, 10)
                                 
-                                HStack {
-                                    Text("versionInfo".localized)
-                                        .font(.system(size: 18, weight: .regular))
-                                        .tracking(0.5)
-                                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
-                                    Spacer()
+                                VStack(spacing: 12) {
+                                    HStack {
+                                        Text("versionInfo".localized)
+                                            .font(.system(size: 18, weight: .regular))
+                                            .tracking(0.5)
+                                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
+                                        Spacer()
+                                    }
+                                    
+                                    Divider()
+                                        .background(Color(red: 0.9, green: 0.9, blue: 0.95))
+                                    
+                                    HStack {
+                                        Text("开发者")
+                                            .font(.system(size: 18, weight: .regular))
+                                            .tracking(0.5)
+                                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
+                                        Spacer()
+                                        Text("MirrorChild团队")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                                    }
+                                    
+                                    Divider()
+                                        .background(Color(red: 0.9, green: 0.9, blue: 0.95))
+                                    
+                                    HStack {
+                                        Text("联系我们")
+                                            .font(.system(size: 18, weight: .regular))
+                                            .tracking(0.5)
+                                            .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.45))
+                                        Spacer()
+                                        Text("support@mirrorchild.com")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
+                                    }
+                                    
+                                    Divider()
+                                        .background(Color(red: 0.9, green: 0.9, blue: 0.95))
+                                    
+                                    HStack {
+                                        Text("© 2024-2025 MirrorChild")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.6))
+                                        Spacer()
+                                    }
                                 }
                                 .padding(15)
                                 .background(
@@ -725,7 +677,7 @@ struct VoiceProfileView: View {
                     }) {
                         Text("完成")
                             .font(.system(size: 17))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                     }
                 }
             }
@@ -777,14 +729,31 @@ struct VoiceProfileView: View {
     // MARK: - Subviews
     
     private var instructionsView: some View {
-        Text("请在安静的环境中录制您的声音样本，以便AI助手学习您的声音特征。")
-            .font(.system(size: 18, weight: .regular))
-            .tracking(0.5)
-            .lineSpacing(5)
-            .multilineTextAlignment(.center)
-            .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
+        VStack(spacing: 15) {
+            Text("请在安静的环境中录制下方文字，以便AI助手学习您的声音特征。")
+                .font(.system(size: 18, weight: .regular))
+                .tracking(0.5)
+                .lineSpacing(5)
+                .multilineTextAlignment(.center)
+                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+            
+            Text("有时候，生活并不需要太多计划。阳光刚好，风也温柔，泡一杯茶，窝在沙发上，听一首老歌，就已经很幸福了。我们总在忙着追赶什么，却忘了慢下来才更能感受到生活的温度。今天，不妨给自己一点时间，好好休息一下吧。")
+                .font(.system(size: 18, weight: .bold))
+                .tracking(0.5)
+                .lineSpacing(6)
+                .multilineTextAlignment(.center)
+                .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.35))
+                .padding(.horizontal, 25)
+                .padding(.vertical, 15)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.9))
+                        .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+                )
+                .padding(.horizontal, 20)
+        }
     }
     
     private var recordingVisualizerView: some View {
@@ -803,13 +772,13 @@ struct VoiceProfileView: View {
                         // 显示录音时长
                         Text(formatDuration(voiceCaptureManager.currentRecordingDuration))
                             .font(.system(size: 22, weight: .semibold))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                         
                         // 实时声波可视化 - 使用状态驱动的波形
                         HStack(spacing: 3) {
                             ForEach(0..<waveformHeights.count, id: \.self) { index in
                                 RoundedRectangle(cornerRadius: 1.5)
-                                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                                    .fill(Color(red: 0.4, green: 0.55, blue: 0.4))
                                     .frame(width: 2, height: waveformHeights[index])
                                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: waveformHeights[index])
                             }
@@ -827,13 +796,13 @@ struct VoiceProfileView: View {
                         // 显示与录音时完全相同的结构
                         Text("录音完成")
                             .font(.system(size: 22, weight: .semibold)) // 与录音时的字体大小和粗细相同
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                         
                         // 显示最后录制时的波形状态，与录音时布局完全一致
                         HStack(spacing: 3) {
                             ForEach(0..<waveformHeights.count, id: \.self) { index in
                                 RoundedRectangle(cornerRadius: 1.5)
-                                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                                    .fill(Color(red: 0.4, green: 0.55, blue: 0.4))
                                     .frame(width: 2, height: waveformHeights[index])
                             }
                         }
@@ -850,7 +819,7 @@ struct VoiceProfileView: View {
                         // 状态文本占位，保持布局一致性
                         Text("准备录音")
                             .font(.system(size: 22, weight: .semibold))
-                            .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                            .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
                         
                         // 静止波形图
                         HStack(spacing: 3) {
@@ -970,7 +939,7 @@ struct VoiceProfileView: View {
                 Capsule()
                     .fill(voiceCaptureManager.isRecording ? 
                          Color.red.opacity(0.8) : 
-                         Color(red: 0.5, green: 0.5, blue: 0.8))
+                         Color(red: 0.455, green: 0.580, blue: 0.455))
                     .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
             )
         }
@@ -998,7 +967,7 @@ struct VoiceProfileView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 0.5, green: 0.5, blue: 0.8))
+                    .fill(Color(red: 0.455, green: 0.580, blue: 0.455))
             )
             .foregroundColor(.white)
             .padding(.horizontal, 20)
@@ -1043,7 +1012,7 @@ struct VoiceProfileView: View {
         HStack {
             Image(systemName: "waveform")
                 .font(.system(size: 18))
-                .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
             
             Text(recording.description)
                 .font(.system(size: 16, weight: .regular))
@@ -1060,7 +1029,7 @@ struct VoiceProfileView: View {
             }) {
                 Image(systemName: isPlayingRecording == recording.id ? "stop.circle.fill" : "play.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(Color(red: 0.5, green: 0.5, blue: 0.8))
+                    .foregroundColor(Color(red: 0.455, green: 0.580, blue: 0.455))
             }
             
             Button(action: {

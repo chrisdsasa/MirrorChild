@@ -1,5 +1,6 @@
 import SwiftUI
 import Speech
+import Combine
 
 struct VoiceCaptureView: View {
     @StateObject private var voiceCaptureManager = VoiceCaptureManager.shared
@@ -8,9 +9,13 @@ struct VoiceCaptureView: View {
     @State private var showingSettingsAlert = false
     @State private var isBlinking = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     
     // 存储API响应文本
     @State private var apiResponseText = ""
+    // 跟踪页面状态
+    @State private var hasAppeared = false
+    @State private var stateResetter: AnyCancellable?
     
     // Check if running in preview mode
     private var isRunningInPreview: Bool {
@@ -96,10 +101,10 @@ struct VoiceCaptureView: View {
                             if voiceCaptureManager.isRecording || !voiceCaptureManager.transcribedText.isEmpty {
                                 transcriptionView
                                     .padding()
-                                    .frame(height: geo.size.height / 2 - 40)
+                                    .frame(height: max(100, geo.size.height / 2 - 40))
                             } else {
                                 emptyStateView
-                                    .frame(height: geo.size.height / 2 - 40)
+                                    .frame(height: max(100, geo.size.height / 2 - 40))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -109,7 +114,7 @@ struct VoiceCaptureView: View {
                                 .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Color(red: 0.7, green: 0.7, blue: 0.9).opacity(0.3), lineWidth: 1)
+                                        .stroke(Color(red: 0.7, green: 0.8, blue: 0.7).opacity(0.3), lineWidth: 1)
                                 )
                         )
                         
@@ -124,7 +129,7 @@ struct VoiceCaptureView: View {
                             
                             apiResponseView
                                 .padding()
-                                .frame(height: geo.size.height / 2 - 40)
+                                .frame(height: max(100, geo.size.height / 2 - 40))
                         }
                         .frame(maxWidth: .infinity)
                         .background(
@@ -141,7 +146,7 @@ struct VoiceCaptureView: View {
                 }
                 
                 // Control buttons
-                HStack(spacing: 30) {
+                HStack(spacing: 60) {
                     if voiceCaptureManager.isRecording {
                         // Stop button
                         Button(action: stopRecording) {
@@ -172,11 +177,19 @@ struct VoiceCaptureView: View {
                         }
                     }
                 }
-                .padding(.top, 10)
-                .padding(.bottom, 30)
+                .padding(.top, 25)
+                .padding(.bottom, 35)
+                .padding(.horizontal, 30)
             }
         }
         .onAppear {
+            if hasAppeared {
+                print("📱 VoiceCaptureView重新出现，强制重置服务")
+                resetService()
+            }
+            
+            hasAppeared = true
+            
             // 检查麦克风权限
             checkPermissions()
             
@@ -185,14 +198,43 @@ struct VoiceCaptureView: View {
                 isBlinking = true
             }
             
-            // 订阅OpenAI响应
-            OpenAIService.shared.onNewResponse = { response in
-                self.apiResponseText = response
+            // 完全重置OpenAI服务，确保状态干净
+            resetService()
+            
+            // 监听TTS播放完成通知，确保UI状态正确更新
+            NotificationCenter.default.addObserver(forName: .didFinishPlayingTTS, object: nil, queue: .main) { _ in
+                print("📱 VoiceCaptureView收到TTS播放完成通知")
+                // 如果需要，可以在这里更新UI状态
             }
+            
+            // 添加一个定时器，每15秒检查并重置服务状态
+            stateResetter = Timer.publish(every: 15, on: .main, in: .common)
+                .autoconnect()
+                .sink { _ in
+                    print("📱 VoiceCaptureView定时检查服务状态")
+                    if !voiceCaptureManager.isRecording {
+                        // 如果没有录音，重置服务，避免状态卡住
+                        OpenAIService.shared.reset()
+                    }
+                }
         }
         .onDisappear {
-            // 取消订阅OpenAI响应
-            OpenAIService.shared.onNewResponse = nil
+            print("📱 VoiceCaptureView消失")
+            cleanupView()
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            switch newPhase {
+            case .background:
+                print("📱 应用进入后台")
+                cleanupView()
+            case .active:
+                if hasAppeared {
+                    print("📱 应用恢复前台")
+                    resetService()
+                }
+            default:
+                break
+            }
         }
         .alert(isPresented: $showingPermissionAlert) {
             if showingSettingsAlert {
@@ -270,7 +312,7 @@ struct VoiceCaptureView: View {
         VStack(spacing: 20) {
             Image(systemName: "waveform")
                 .font(.system(size: 60))
-                .foregroundColor(Color(red: 0.7, green: 0.7, blue: 0.8).opacity(0.5))
+                .foregroundColor(Color(red: 0.7, green: 0.8, blue: 0.7).opacity(0.5))
             
             if voiceCaptureManager.permissionStatus == .denied {
                 Text("permissionDeniedMessage".localized)
@@ -322,6 +364,39 @@ struct VoiceCaptureView: View {
             showingSettingsAlert = true
             showingPermissionAlert = true
         }
+    }
+    
+    // 添加一个方法来重置服务状态
+    private func resetService() {
+        print("📱 VoiceCaptureView重置OpenAIService")
+        
+        // 完全重置OpenAI服务
+        OpenAIService.shared.reset()
+        
+        // 重新订阅OpenAI响应
+        OpenAIService.shared.onNewResponse = { response in
+            self.apiResponseText = response
+        }
+    }
+    
+    // 添加一个方法来清理视图资源
+    private func cleanupView() {
+        // 停止语音录制（如果正在进行）
+        if voiceCaptureManager.isRecording {
+            voiceCaptureManager.stopRecording()
+        }
+        
+        // 停止自动发送
+        OpenAIService.shared.stopAutoSend()
+        
+        // 取消订阅OpenAI响应
+        OpenAIService.shared.onNewResponse = nil
+        
+        // 取消定时器
+        stateResetter?.cancel()
+        
+        // 移除通知观察者
+        NotificationCenter.default.removeObserver(self, name: .didFinishPlayingTTS, object: nil)
     }
 }
 

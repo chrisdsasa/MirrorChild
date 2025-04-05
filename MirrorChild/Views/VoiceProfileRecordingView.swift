@@ -15,6 +15,8 @@ struct VoiceProfileRecordingView: View {
     @State private var recordingDescription = ""
     @State private var remainingSeconds: Int = 15 // 倒计时15秒
     @State private var countdownTimer: Timer?
+    @State private var isIndicatorBlinking = false // 控制绿色指示灯闪烁的状态
+    @State private var blinkTimer: Timer? // 专门用于控制闪烁的计时器
     
     // 标准句子示例，用于录制
     private let sampleSentences = [
@@ -152,10 +154,21 @@ struct VoiceProfileRecordingView: View {
                     .padding(.vertical, 10)
                     
                     // 录音状态提示
-                    Text(statusText)
-                        .font(.system(size: 17, design: .rounded))
-                        .foregroundColor(statusColor)
-                        .padding(.bottom, 10)
+                    HStack(spacing: 10) {
+                        // 录音时显示闪烁的绿色指示灯
+                        if voiceCaptureManager.isRecording {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 14, height: 14)
+                                .opacity(isIndicatorBlinking ? 1.0 : 0.2)
+                                .animation(.none, value: isIndicatorBlinking) // 禁用隐式动画以使闪烁更明显
+                        }
+                        
+                        Text(statusText)
+                            .font(.system(size: 17, design: .rounded))
+                            .foregroundColor(statusColor)
+                    }
+                    .padding(.bottom, 10)
                     
                     // 按钮区域
                     HStack(spacing: 20) {
@@ -263,8 +276,7 @@ struct VoiceProfileRecordingView: View {
             .onDisappear {
                 // 停止任何正在进行的录音和计时器
                 stopRecording()
-                countdownTimer?.invalidate()
-                countdownTimer = nil
+                cleanupTimers()
             }
         }
     }
@@ -275,7 +287,7 @@ struct VoiceProfileRecordingView: View {
         }
         
         if voiceCaptureManager.isRecording {
-            return "正在录音..."
+            return "能听到我说话吗"
         }
         
         if isCompleted {
@@ -324,6 +336,23 @@ struct VoiceProfileRecordingView: View {
         // 开始录制
         voiceCaptureManager.startVoiceFileRecording()
         
+        // 设置初始状态为显示
+        isIndicatorBlinking = true
+        
+        // 使用Timer控制闪烁，每1秒切换一次状态
+        blinkTimer?.invalidate()
+        blinkTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            DispatchQueue.main.async {
+                // 切换闪烁状态
+                self.isIndicatorBlinking.toggle()
+            }
+        }
+        
+        // 确保计时器在滚动时也能继续运行
+        if let timer = blinkTimer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
+        
         // 显示录音状态
         print("正在录制语音，等待15秒...")
         
@@ -347,6 +376,11 @@ struct VoiceProfileRecordingView: View {
     
     private func stopRecording() {
         print("停止录音")
+        
+        // 停止闪烁动画
+        isIndicatorBlinking = false
+        blinkTimer?.invalidate()
+        blinkTimer = nil
         
         // 停止倒计时
         countdownTimer?.invalidate()
@@ -379,6 +413,14 @@ struct VoiceProfileRecordingView: View {
             // 标记为已完成语音设置
             UserDefaults.standard.set(true, forKey: "hasCompletedVoiceSetup")
         }
+    }
+    
+    // 确保在页面消失时清理所有计时器
+    private func cleanupTimers() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        blinkTimer?.invalidate()
+        blinkTimer = nil
     }
 }
 

@@ -34,6 +34,7 @@ class OpenAIService: NSObject {
     private var lastSentText = ""
     private var lastResponseText = ""
     private var isProcessing = false
+    private var lastProcessingStartTime: Date?
     
     // 取消订阅
     private var cancellables = Set<AnyCancellable>()
@@ -44,10 +45,14 @@ class OpenAIService: NSObject {
     // 音频播放器
     private var audioPlayer: AVAudioPlayer?
     
+    // 状态重置定时器
+    private var statusResetTimer: Timer?
+    
     // 初始化时设置观察者
     private override init() {
         super.init()
         setupObservers()
+        setupStatusResetTimer()
     }
     
     private func setupObservers() {
@@ -63,6 +68,50 @@ class OpenAIService: NSObject {
                 self?.stopAutoSend()
             }
             .store(in: &cancellables)
+        
+        // 监听应用进入后台的通知
+        NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+            .sink { [weak self] _ in
+                // 应用进入后台时，确保所有处理正常停止
+                self?.stopAutoSend()
+            }
+            .store(in: &cancellables)
+        
+        // 监听应用恢复前台的通知
+        NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
+            .sink { [weak self] _ in
+                // 应用恢复前台时，确保状态是干净的
+                self?.reset()
+            }
+            .store(in: &cancellables)
+    }
+    
+    // 设置状态重置定时器，确保服务状态不会长时间卡住
+    private func setupStatusResetTimer() {
+        // 取消现有定时器
+        statusResetTimer?.invalidate()
+        
+        // 创建新定时器，每30秒检查一次状态
+        statusResetTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            if self.isProcessing {
+                // 检查处理开始时间
+                if let startTime = self.lastProcessingStartTime, Date().timeIntervalSince(startTime) > 30 {
+                    print("⏰ 定时检查发现isProcessing长时间为true，强制重置")
+                    self.isProcessing = false
+                    self.lastProcessingStartTime = nil
+                } else if self.lastProcessingStartTime == nil {
+                    print("⏰ 定时检查发现isProcessing为true但无开始时间，重置状态")
+                    self.isProcessing = false
+                }
+            }
+        }
+        
+        // 确保定时器在滚动等情况下仍然触发
+        if let timer = statusResetTimer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
     }
     
     // 启动自动发送功能
@@ -111,14 +160,35 @@ class OpenAIService: NSObject {
         lastSentText = ""
         lastResponseText = ""
         
+        // 重置所有处理状态，确保不会卡住
+        isProcessing = false
+        lastProcessingStartTime = nil
+        
         print("已停止自动发送功能")
     }
     
     // 自动发送数据到API
     private func autoSendDataToAPI() {
+        // 检查是否有一个超时的处理过程（超过15秒，从20秒减少为15秒）
+        if isProcessing, let startTime = lastProcessingStartTime, Date().timeIntervalSince(startTime) > 15.0 {
+            print("⚠️ 检测到卡住的请求处理状态，已超过15秒，强制重置状态")
+            isProcessing = false
+        }
+        
         // 避免重复处理
         guard !isProcessing else {
-            print("上一次请求仍在处理中，跳过本次发送")
+            print("❌ 上一次请求仍在处理中，跳过本次发送 (isProcessing = \(isProcessing))")
+            
+            // 如果lastProcessingStartTime为nil，这可能是一个未正确初始化的状态
+            if lastProcessingStartTime == nil {
+                print("🔄 检测到潜在的状态不一致，强制重置isProcessing")
+                isProcessing = false
+                // 尝试再次执行方法，现在isProcessing已被重置
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.autoSendDataToAPI()
+                }
+                return
+            }
             return
         }
         
@@ -153,6 +223,9 @@ class OpenAIService: NSObject {
         
         // 更新最后发送的文本
         lastSentText = currentText
+        
+        // 记录处理开始时间
+        lastProcessingStartTime = Date()
         
         // 获取当前帧
         screenCaptureManager.prepareDataForOpenAI { [weak self] frames, error in
@@ -220,6 +293,7 @@ class OpenAIService: NSObject {
             
             // 开始处理，设置标志
             self.isProcessing = true
+            print("🔒 设置处理标志 isProcessing = true, 时间: \(Date())")
             
             // 执行API请求
             print("正在发送数据到OpenAI API: \(frames?.count ?? 0)个帧, 文本: \(currentText)")
@@ -330,6 +404,7 @@ class OpenAIService: NSObject {
             
             // 重置处理标志
             self.isProcessing = false
+            print("🔓 重置处理标志 isProcessing = false (文本模式), 时间: \(Date())")
             
             if let error = error {
                 let networkError = NSError(domain: "com.mirrochild.openai", 
@@ -422,9 +497,22 @@ class OpenAIService: NSObject {
             switch result {
             case .success(let content):
                 // 使用多模态输入创建请求
-                self.createResponsesRequest(content: content, completion: completion)
+                self.createResponsesRequest(content: content) { result in
+                    // 确保在完成回调中也重置处理标志
+                    DispatchQueue.main.async {
+                        if self.isProcessing {
+                            print("🔓 在请求完成后确保重置 isProcessing = false, 时间: \(Date())")
+                            self.isProcessing = false
+                        }
+                        completion(result)
+                    }
+                }
             case .failure(let error):
-                completion(.failure(error))
+                DispatchQueue.main.async {
+                    print("🔓 因错误重置 isProcessing = false, 时间: \(Date())")
+                    self.isProcessing = false
+                    completion(.failure(error))
+                }
             }
         }
     }
@@ -558,7 +646,15 @@ class OpenAIService: NSObject {
         }
         
         // 发送请求
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            // 确保重置处理标志
+            DispatchQueue.main.async {
+                self.isProcessing = false
+                print("🔓 API响应后重置处理标志 isProcessing = false, 时间: \(Date())")
+            }
+            
             if let error = error {
                 completion(.failure(error))
                 return
@@ -736,50 +832,88 @@ class OpenAIService: NSObject {
     
     // 播放音频数据
     private func playAudio(data: Data, completion: @escaping (Result<Void, Error>) -> Void) {
-        do {
-            // 通知VoiceCaptureManager暂停录音
-            NotificationCenter.default.post(name: .willPlayTTS, object: nil)
+        // 通知VoiceCaptureManager暂停录音
+        NotificationCenter.default.post(name: .willPlayTTS, object: nil)
+        
+        // 等待一小段时间让录音停止
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
             
-            // 等待一小段时间让录音停止
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self = self else { return }
+            do {
+                // 创建音频播放器
+                self.audioPlayer = try AVAudioPlayer(data: data)
                 
-                do {
-                    // 创建音频播放器
-                    self.audioPlayer = try AVAudioPlayer(data: data)
-                    
-                    // 设置音频会话，允许混音和播放
-                    let audioSession = AVAudioSession.sharedInstance()
-                    try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
-                    try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                    
-                    // 设置播放完成回调
-                    self.audioPlayer?.delegate = self
-                    self.audioPlayer?.volume = 1.0
-                    
-                    // 开始播放
-                    if self.audioPlayer?.play() == true {
-                        print("开始播放TTS音频")
-                        completion(.success(()))
-                    } else {
-                        let playError = NSError(domain: "com.mirrochild.openai", 
-                                              code: 10, 
-                                              userInfo: [NSLocalizedDescriptionKey: "无法播放TTS音频"])
-                        completion(.failure(playError))
-                    }
-                } catch {
-                    let audioError = NSError(domain: "com.mirrochild.openai", 
-                                           code: 11, 
-                                           userInfo: [NSLocalizedDescriptionKey: "音频播放初始化错误: \(error.localizedDescription)"])
-                    completion(.failure(audioError))
+                // 设置音频会话，允许混音和播放
+                let audioSession = AVAudioSession.sharedInstance()
+                try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
+                try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                
+                // 设置播放完成回调
+                self.audioPlayer?.delegate = self
+                self.audioPlayer?.volume = 1.0
+                
+                // 开始播放
+                if self.audioPlayer?.play() == true {
+                    print("开始播放TTS音频")
+                    completion(.success(()))
+                } else {
+                    let playError = NSError(domain: "com.mirrochild.openai", 
+                                          code: 10, 
+                                          userInfo: [NSLocalizedDescriptionKey: "无法播放TTS音频"])
+                    completion(.failure(playError))
                 }
+            } catch {
+                let audioError = NSError(domain: "com.mirrochild.openai", 
+                                       code: 11, 
+                                       userInfo: [NSLocalizedDescriptionKey: "音频播放初始化错误: \(error.localizedDescription)"])
+                completion(.failure(audioError))
             }
-        } catch {
-            let audioError = NSError(domain: "com.mirrochild.openai", 
-                                   code: 11, 
-                                   userInfo: [NSLocalizedDescriptionKey: "音频播放初始化错误: \(error.localizedDescription)"])
-            completion(.failure(audioError))
         }
+    }
+    
+    // 完全重置所有状态
+    func reset() {
+        // 确保在主线程执行
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.reset()
+            }
+            return
+        }
+        
+        print("🔄 开始完全重置OpenAIService状态")
+        
+        // 停止自动发送
+        stopAutoSend()
+        
+        // 清除音频播放器
+        if audioPlayer != nil {
+            print("🔊 停止并清除音频播放器")
+            audioPlayer?.stop()
+            audioPlayer = nil
+        }
+        
+        // 重置所有状态变量
+        let wasProcessing = isProcessing
+        isProcessing = false
+        lastProcessingStartTime = nil
+        lastSentText = ""
+        lastResponseText = ""
+        
+        if wasProcessing {
+            print("⚠️ 重置时发现isProcessing=true，已强制清除")
+        }
+        
+        // 重置定时器
+        setupStatusResetTimer()
+        
+        print("✅ OpenAIService已完全重置")
+    }
+    
+    deinit {
+        // 清理定时器
+        statusResetTimer?.invalidate()
+        statusResetTimer = nil
     }
 }
 
@@ -793,18 +927,34 @@ extension Notification.Name {
 // 添加AVAudioPlayerDelegate扩展
 extension OpenAIService: AVAudioPlayerDelegate {
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        print("TTS音频播放结束")
+        print("🔊 TTS音频播放结束")
         
         // 清理资源
         self.audioPlayer = nil
         
+        // 重置处理标志，确保下一个请求可以继续
+        self.isProcessing = false
+        print("🔓 音频播放结束，重置isProcessing = false")
+        
+        // 确保lastProcessingStartTime也被重置
+        self.lastProcessingStartTime = nil
+        
         // 恢复音频会话（如果需要）
         do {
+            // 注意：setActive方法可能会抛出错误，例如当音频会话被其他应用控制
+            // 此方法的声明：func setActive(_ active: Bool, options: AVAudioSession.SetActiveOptions = []) throws
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             // 通知录音可以恢复（如果需要）
             NotificationCenter.default.post(name: .didFinishPlayingTTS, object: nil)
-        } catch {
-            print("重置音频会话时出错: \(error.localizedDescription)")
+            
+            // 强制延迟再次重置，确保所有状态都被清除
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.isProcessing = false
+                self?.lastProcessingStartTime = nil
+                print("🔓 音频播放后延迟强制重置isProcessing = false")
+            }
+        } catch let sessionError {
+            print("❌ 重置音频会话时出错: \(sessionError.localizedDescription)")
         }
     }
 }

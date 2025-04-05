@@ -11,12 +11,12 @@ struct DesignSystem {
         static let accentDark = Color.accentColor.opacity(0.8)
         
         // Named theme colors
-        static let rebeccaPurple = Color(red: 0.4, green: 0.2, blue: 0.6) // #663399
-        static let thistle = Color(red: 0.847, green: 0.749, blue: 0.847) // #D8BFD8
+        static let accentGreen = Color(red: 0.455, green: 0.580, blue: 0.455) // #749474
+        static let lightGreen = Color(red: 0.663, green: 0.761, blue: 0.663) // #A9C2A9
         
         // Surface colors
-        static let surface = thistle.opacity(0.2)
-        static let surfaceSecondary = thistle.opacity(0.1)
+        static let surface = lightGreen.opacity(0.2)
+        static let surfaceSecondary = lightGreen.opacity(0.1)
         
         // Text colors
         static let textPrimary = Color.primary.opacity(0.9)
