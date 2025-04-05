@@ -21,7 +21,7 @@ class OpenAIService: NSObject {
             return savedKey
         } else {
             // 默认测试用API密钥 - 仅用于演示，实际部署时应移除
-            return "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"
+            return "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"
         }
     }
     
