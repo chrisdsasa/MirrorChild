@@ -212,6 +212,8 @@ class VoiceCaptureManager: NSObject, ObservableObject {
     // 添加一个标记来跟踪后台任务的状态
     private var voiceBackgroundTaskId: UIBackgroundTaskIdentifier = .invalid
     
+    @Published var voiceCloneName: String = ""
+    
     // 初始化
     private override init() {
         super.init()
@@ -1107,48 +1109,91 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             return
         }
         
+        // 确保名称不为空
+        if voiceCloneName.isEmpty {
+            voiceCloneName = "我的声音_\(Date().timeIntervalSince1970)"
+        }
+        
         // 更新状态为上传中
         self.cloneStatus = .uploading
         
-        // 创建请求
-        let apiURL = URL(string: "https://api.example.com/voice-clone")!
-        var request = URLRequest(url: apiURL)
-        request.httpMethod = "POST"
-        
-        // 创建multipart请求
-        let boundary = UUID().uuidString
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        // 你可能需要添加API密钥
-        request.setValue("YOUR_API_KEY", forHTTPHeaderField: "Authorization")
-        
-        // 创建请求体
-        var body = Data()
-        
-        // 添加语音类型参数
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"voice_type\"\r\n\r\n".data(using: .utf8)!)
-        body.append("\(selectedVoiceType)\r\n".data(using: .utf8)!)
-        
-        // 添加语音文件
+        // 首先将音频文件上传到服务器获取URL
+        uploadAudioFile(fileURL) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let audioFileURL):
+                // 音频文件上传成功，调用声音克隆API
+                self.callCloneVoiceAPI(audioFileURL: audioFileURL, name: self.voiceCloneName)
+            case .failure(let error):
+                // 上传失败
+                DispatchQueue.main.async {
+                    self.cloneStatus = .failed(error: error)
+                    print("上传音频文件失败：\(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    // 上传音频文件到服务器获取URL
+    private func uploadAudioFile(_ fileURL: URL, completion: @escaping (Result<String, Error>) -> Void) {
+        // 由于我们没有实际的文件上传服务器，这里直接使用本地文件
+        // 在实际应用中，这里应该实现将文件上传到公开可访问的服务器并获取URL的逻辑
+        // 临时示例 - 模拟成功情况，将本地文件直接传递给API
         do {
+            // 读取文件数据
             let audioData = try Data(contentsOf: fileURL)
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"voice_file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: audio/m4a\r\n\r\n".data(using: .utf8)!)
-            body.append(audioData)
-            body.append("\r\n".data(using: .utf8)!)
+            
+            // 记录文件大小
+            print("音频文件大小: \(audioData.count) 字节")
+            
+            // 假设文件已上传并返回URL
+            let temporaryURL = "https://example.com/audio/\(UUID().uuidString).m4a"
+            
+            // 模拟网络延迟
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                completion(.success(temporaryURL))
+            }
         } catch {
+            print("读取音频文件失败: \(error.localizedDescription)")
+            completion(.failure(error))
+        }
+    }
+    
+    // 调用声音克隆API
+    private func callCloneVoiceAPI(audioFileURL: String, name: String) {
+        // 使用API文档中的端点
+        guard let apiURL = URL(string: "https://mapi.yunmaovideo.com/api-v1/clone-voice") else {
+            let error = NSError(domain: "com.mirrochild.voiceclone", code: 2, userInfo: [NSLocalizedDescriptionKey: "无效的API URL"])
             self.cloneStatus = .failed(error: error)
-            print("读取语音文件失败：\(error.localizedDescription)")
             return
         }
         
-        // 结束请求体
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        // 创建请求
+        var request = URLRequest(url: apiURL)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // 设置请求体
-        request.httpBody = body
+        // 添加API密钥
+        request.addValue("5VcLUCJDjDass67EnZDBrADB", forHTTPHeaderField: "Authorization")
+        
+        // 准备请求参数
+        let parameters: [String: Any] = [
+            "url": audioFileURL,
+            "lang": "zh-cn",
+            "notify": "https://example.com/api/voice-clone-callback",
+            "type": "ins",
+            "name": name
+        ]
+        
+        // 序列化请求参数
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: parameters)
+        } catch {
+            self.cloneStatus = .failed(error: error)
+            print("准备请求参数失败：\(error.localizedDescription)")
+            return
+        }
         
         // 发送请求
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
@@ -1157,12 +1202,12 @@ class VoiceCaptureManager: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 if let error = error {
                     self.cloneStatus = .failed(error: error)
-                    print("上传失败：\(error.localizedDescription)")
+                    print("API请求失败：\(error.localizedDescription)")
                     return
                 }
                 
                 guard let data = data, let httpResponse = response as? HTTPURLResponse else {
-                    let error = NSError(domain: "com.mirrochild.voiceclone", code: 2, userInfo: [NSLocalizedDescriptionKey: "无效的服务器响应"])
+                    let error = NSError(domain: "com.mirrochild.voiceclone", code: 3, userInfo: [NSLocalizedDescriptionKey: "无效的服务器响应"])
                     self.cloneStatus = .failed(error: error)
                     return
                 }
@@ -1178,6 +1223,9 @@ class VoiceCaptureManager: NSObject, ObservableObject {
                             UserDefaults.standard.set(voiceId, forKey: "clonedVoiceId")
                             self.cloneStatus = .success(voiceId: voiceId)
                             print("声音克隆成功！声音ID：\(voiceId)")
+                            
+                            // 保存声音名称
+                            UserDefaults.standard.set(self.voiceCloneName, forKey: "clonedVoiceName")
                             
                             // 标记为已完成语音设置
                             self.hasCompletedVoiceSetup = true

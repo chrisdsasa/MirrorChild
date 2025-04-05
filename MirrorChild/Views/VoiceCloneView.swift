@@ -190,10 +190,25 @@ struct VoiceCloneView: View {
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundColor(.primary)
             
-            Text("点击上传按钮将声音上传到服务器进行克隆")
+            Text("请为你的声音起一个名字，然后点击上传按钮")
                 .font(.system(size: 15, design: .rounded))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            // 声音名称输入框
+            TextField("声音名称", text: $voiceCaptureManager.voiceCloneName)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(.systemGray6))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+                .padding(.horizontal, 30)
+                .padding(.top, 10)
         }
     }
     
